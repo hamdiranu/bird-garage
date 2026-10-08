@@ -1,0 +1,208 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #2f8bff;
+  --color-plate: #f5c518; /* Indonesian public-transport plate yellow */
+  --spacing-gut: max(16px, 1.8vw);
+}
+
+/* `light:` styles apply while the daytime theme is on */
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+
+/* inline so utilities read the live theme tokens below (and the per-service --accent set on the app root) */
+@theme inline {
+  --color-night: var(--night);
+  --color-pit: var(--rcard-b);
+  --color-line: var(--line);
+  --color-edge: var(--edge);
+  --color-ink: var(--ink);
+  --color-dim: var(--dim);
+  --color-soft: var(--soft);
+  --color-accent: var(--accent-ui);
+  --font-display: var(--font-barlow), "Arial Narrow", Impact, sans-serif;
+  --font-hud: var(--font-chakra), "Trebuchet MS", Verdana, sans-serif;
+}
+
+/* ---------- theme tokens ----------
+   Registered as colours so the browser can interpolate them: switching data-theme on <html> then eases
+   every surface, border and text colour at once through the single transition on :root. */
+@property --night { syntax: "<color>"; inherits: true; initial-value: #050c1d; }
+@property --line { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --edge { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --ink { syntax: "<color>"; inherits: true; initial-value: #eaf2fc; }
+@property --soft { syntax: "<color>"; inherits: true; initial-value: #c5d1e2; }
+@property --dim { syntax: "<color>"; inherits: true; initial-value: #8fa3c2; }
+@property --hdr-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --hdr-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --chip { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --float { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --float-edge { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --pill { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --card-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --card-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --card-hi { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --drop { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --tile { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --icon { syntax: "<color>"; inherits: true; initial-value: #8cc4ff; }
+@property --icon-bg { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --track { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --roster-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --roster-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --rcard-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --rcard-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --rcard-on-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --rcard-on-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --foot { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --shade { syntax: "<color>"; inherits: true; initial-value: #050c1d; }
+@property --title-a { syntax: "<color>"; inherits: true; initial-value: #ffffff; }
+@property --title-b { syntax: "<color>"; inherits: true; initial-value: #9cc8ff; }
+@property --title-glow { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --kicker { syntax: "<color>"; inherits: true; initial-value: #9fd0ff; }
+@property --on-accent { syntax: "<color>"; inherits: true; initial-value: #07101c; }
+@property --accent-darken { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+
+:root {
+  color-scheme: dark;
+  --accent: #5db4ff;
+  --side: clamp(290px, 26vw, 380px);
+
+  --night: #050c1d;
+  --line: rgba(150, 185, 235, 0.18);
+  --edge: rgba(96, 160, 255, 0.24);
+  --ink: #eaf2fc;
+  --soft: #c5d1e2;
+  --dim: #8fa3c2;
+  --hdr-a: #0b1834;
+  --hdr-b: #060f24;
+  --chip: rgba(6, 14, 32, 0.8);
+  --float: rgba(8, 18, 40, 0.7);
+  --float-edge: rgba(110, 170, 255, 0.45);
+  --pill: rgba(20, 38, 76, 0.45);
+  --card-a: rgba(17, 34, 70, 0.66);
+  --card-b: rgba(8, 17, 38, 0.72);
+  --card-hi: rgba(160, 200, 255, 0.08);
+  --drop: rgba(0, 0, 0, 0.7);
+  --tile: rgba(10, 22, 48, 0.45);
+  --icon: #8cc4ff;
+  --icon-bg: rgba(47, 139, 255, 0.1);
+  --track: rgba(150, 185, 235, 0.12);
+  --roster-a: #081430;
+  --roster-b: #050c1d;
+  --rcard-a: #0f1f42;
+  --rcard-b: #0a1530;
+  --rcard-on-a: #14306a;
+  --rcard-on-b: #0b1838;
+  --foot: #040a18;
+  --shade: #050c1d;
+  --title-a: #ffffff;
+  --title-b: #9cc8ff;
+  --title-glow: rgba(0, 0, 0, 0.6);
+  --kicker: #9fd0ff;
+  --on-accent: #07101c;
+  --accent-darken: 0%;
+
+  transition-property:
+    --night, --line, --edge, --ink, --soft, --dim, --hdr-a, --hdr-b, --chip, --float, --float-edge, --pill,
+    --card-a, --card-b, --card-hi, --drop, --tile, --icon, --icon-bg, --track, --roster-a, --roster-b,
+    --rcard-a, --rcard-b, --rcard-on-a, --rcard-on-b, --foot, --shade, --title-a, --title-b, --title-glow,
+    --kicker, --on-accent, --accent-darken;
+  transition-duration: 0.7s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Daytime showroom: frosted white glass, navy type, the same brand blue. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --night: #e8eef6;
+  --line: rgba(30, 60, 110, 0.14);
+  --edge: rgba(40, 95, 180, 0.2);
+  --ink: #0c1b33;
+  --soft: #33496b;
+  --dim: #5d7090;
+  --hdr-a: rgba(255, 255, 255, 0.94);
+  --hdr-b: rgba(236, 242, 250, 0.94);
+  --chip: rgba(255, 255, 255, 0.8);
+  --float: rgba(255, 255, 255, 0.72);
+  --float-edge: rgba(40, 95, 180, 0.3);
+  --pill: rgba(28, 72, 140, 0.07);
+  --card-a: rgba(255, 255, 255, 0.64);
+  --card-b: rgba(238, 243, 250, 0.7);
+  --card-hi: rgba(255, 255, 255, 0.9);
+  --drop: rgba(30, 50, 90, 0.22);
+  --tile: rgba(226, 235, 247, 0.55);
+  --icon: #1d63d6;
+  --icon-bg: rgba(47, 139, 255, 0.12);
+  --track: rgba(30, 60, 110, 0.12);
+  --roster-a: rgba(246, 249, 253, 0.97);
+  --roster-b: #e4ebf4;
+  --rcard-a: #ffffff;
+  --rcard-b: #eef3fa;
+  --rcard-on-a: #e6f0ff;
+  --rcard-on-b: #d3e4ff;
+  --foot: #dbe3ee;
+  --shade: #e8eef6;
+  --title-a: #0c1b33;
+  --title-b: #1d5fd0;
+  --title-glow: rgba(255, 255, 255, 0.85);
+  --kicker: #1d63d6;
+  --on-accent: #ffffff;
+  --accent-darken: 38%;
+}
+
+/* Light, pastel service colours would vanish on white glass; pull them toward navy as the theme lightens. */
+.garage {
+  --accent-ui: color-mix(in oklab, var(--accent) calc(100% - var(--accent-darken)), #0a2550);
+}
+
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--ink);
+  font: 400 15px/1.45 var(--font-hud);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-plate);
+  outline-offset: 2px;
+}
+
+/* Frosted card floating over the showroom. */
+@utility glass {
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--edge);
+  box-shadow:
+    inset 0 1px 0 var(--card-hi),
+    0 24px 60px -24px var(--drop);
+  backdrop-filter: blur(18px);
+}
+
+/* Glossy blue for the active pill and toggles. */
+@utility brand-fill {
+  background: linear-gradient(180deg, #3a95ff, #1b62e6);
+  border-color: #64adff;
+  color: #fff;
+  box-shadow:
+    0 0 18px rgba(47, 139, 255, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
