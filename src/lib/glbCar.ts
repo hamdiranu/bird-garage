@@ -1,20 +1,35 @@
-/* Scanned cars: an untextured mesh (no UVs, no materials) with the livery painted on in a shader.
-   Regions are placed in the car's own proportions: u runs from the front bumper (0) to the rear (1),
-   v from the ground (0) to the roof (1), and az from the centre line (0) to the body side (1). */
+/* Scanned cars from GLB files. A textured scan keeps its own material. An untextured mesh (no UVs, no
+   materials) gets the livery painted on in a shader, with regions placed in the car's own proportions:
+   u runs from the front bumper (0) to the rear (1), v from the ground (0) to the roof (1), and az from
+   the centre line (0) to the body side (1). */
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import type { Car } from "./fleet";
-import { getMats, lampUniform, type BuiltCar } from "./carModel";
+import type { BuiltCar } from "./carModel";
 
 const loads = new Map<string, Promise<BuiltCar>>();
 
 export function loadGlbCar(car: Car): Promise<BuiltCar> {
   let p = loads.get(car.id);
   if (!p) {
-    p = new GLTFLoader().loadAsync(car.glb!).then((gltf) => build(car, gltf.scene));
+    // Models are shrunk with glTF-Transform (Meshopt geometry, WebP textures), so the loader needs the decoder.
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    p = loader.loadAsync(car.glb!).then((gltf) => build(car, gltf.scene));
     loads.set(car.id, p);
   }
   return p;
+}
+
+/** Unpack quantised attributes (e.g. 16-bit positions limited to -1…1) into plain floats, so the geometry
+    can be moved and scaled to metres without clipping. */
+function toFloat(geo: THREE.BufferGeometry) {
+  for (const [name, a] of Object.entries(geo.attributes)) {
+    if (a instanceof THREE.BufferAttribute && a.array instanceof Float32Array && !a.normalized) continue;
+    const out = new Float32Array(a.count * a.itemSize);
+    for (let i = 0; i < a.count; i++) for (let k = 0; k < a.itemSize; k++) out[i * a.itemSize + k] = a.getComponent(i, k);
+    geo.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
+  }
 }
 
 /* Side decal band, in u/v. */
@@ -27,20 +42,29 @@ function build(car: Car, scene: THREE.Object3D): BuiltCar {
   let src: THREE.Mesh | undefined;
   scene.traverse((n) => { if (!src && n instanceof THREE.Mesh) src = n; });
   if (!src) throw new Error(`${car.glb}: no mesh`);
+  const srcMat = src.material as THREE.MeshStandardMaterial;
+  const textured = !!srcMat.map;
   const geo = src.geometry.clone();
+  toFloat(geo);
   geo.applyMatrix4(src.matrixWorld);
-  geo.deleteAttribute("normal");
-  geo.rotateY(Math.PI); // the scan faces -x; the app's cars face +x
+  // A textured scan's normals match its normal map, so keep them; an untextured one gets smooth normals below.
+  if (!textured) geo.deleteAttribute("normal");
+  geo.rotateY(car.glbYaw ?? Math.PI); // the app's cars face +x
 
   // Measure: roof height away from the narrow roof sign, and body width from the rear half (mirrors are up front).
   geo.computeBoundingBox();
   const bb = geo.boundingBox!, pos = geo.attributes.position as THREE.BufferAttribute;
   const midX = (bb.min.x + bb.max.x) / 2, midZ = (bb.min.z + bb.max.z) / 2, halfZ = (bb.max.z - bb.min.z) / 2;
   let roof = -Infinity, bodyHalf = 0;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = Math.abs(pos.getZ(i) - midZ);
-    if (z > halfZ * 0.4) roof = Math.max(roof, y);
-    if (x < midX) bodyHalf = Math.max(bodyHalf, z);
+  if (car.glbFit) {
+    roof = bb.min.y + car.glbFit.roof;
+    bodyHalf = car.glbFit.halfWidth;
+  } else {
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = Math.abs(pos.getZ(i) - midZ);
+      if (z > halfZ * 0.4) roof = Math.max(roof, y);
+      if (x < midX) bodyHalf = Math.max(bodyHalf, z);
+    }
   }
   // Length and height share one scale (close to it) so the wheels stay round; width is set on its own.
   // (Read the scan's size now: computeBoundingBox below reuses this same Box3.)
@@ -49,8 +73,17 @@ function build(car: Car, scene: THREE.Object3D): BuiltCar {
   const sx = L / scanLen, sy = H / (roof - bb.min.y), sz = W / (2 * bodyHalf);
   geo.translate(-midX, -bb.min.y, -midZ);
   geo.scale(sx, sy, sz);
-  geo.computeVertexNormals();
+  if (!textured) geo.computeVertexNormals();
   geo.computeBoundingBox();
+
+  const group = new THREE.Group();
+  group.add(new THREE.Mesh(geo, textured ? srcMat : paintedMaterial(car, geo, scanLen, sy)));
+  return { root: group, wheels: [], height: geo.boundingBox!.max.y };
+}
+
+/** The Bluebird Prime livery for an untextured scan, fitted to its wheels. */
+function paintedMaterial(car: Car, geo: THREE.BufferGeometry, scanLen: number, sy: number) {
+  const { L, H, W } = car.p, pos = geo.attributes.position as THREE.BufferAttribute;
 
   // Wheel centres: where the tyres touch the ground.
   const front: number[] = [], rear: number[] = [];
@@ -65,19 +98,7 @@ function build(car: Car, scene: THREE.Object3D): BuiltCar {
     for (const cx of [wf, wr]) if (Math.hypot((x - cx) / rx, (y - ry) / ry) < 0.6) rimZ = Math.max(rimZ, Math.abs(pos.getZ(i)));
   }
 
-  const mat = liveryMaterial({ front: L / 2, len: L, roof: H, halfW: W / 2, wf, wr, rx, ry, rimZ });
-  const group = new THREE.Group();
-  group.add(new THREE.Mesh(geo, mat));
-
-  // Headlamp glow, as on the sketched cars.
-  const M = getMats();
-  for (const s of [1, -1]) {
-    const sp = new THREE.Sprite(M.glow);
-    sp.scale.setScalar(0.6);
-    sp.position.set(L / 2 + 0.03, H * 0.57, s * (W / 2) * 0.68);
-    group.add(sp);
-  }
-  return { root: group, wheels: [] };
+  return liveryMaterial({ front: L / 2, len: L, roof: H, halfW: W / 2, wf, wr, rx, ry, rimZ });
 }
 
 interface Dims { front: number; len: number; roof: number; halfW: number; wf: number; wr: number; rx: number; ry: number; rimZ: number }
@@ -127,15 +148,15 @@ const LIVERY_GLSL = /* glsl */ `
 uniform vec3 uBody, uGlass, uTyre, uRim, uChrome, uPanel, uPlate, uSign;
 uniform vec4 uDims;    // front x, length, roof height, half width
 uniform vec4 uWheels;  // front centre x, rear centre x, radius along x, radius along y (= centre height)
-uniform float uRimZ, uLamps;
+uniform float uRimZ;
 uniform sampler2D uDecalA, uDecalB;
 varying vec3 vCarP;
 varying vec3 vCarN;
 
-void livery(out vec3 col, out float rough, out float metal, out float coat, out vec3 emit) {
+void livery(out vec3 col, out float rough, out float metal, out float coat) {
   vec3 p = vCarP, n = normalize(vCarN);
   float u = (uDims.x - p.x) / uDims.y, v = p.y / uDims.z, az = abs(p.z) / uDims.w, side = abs(n.z);
-  col = uBody; rough = 0.3; metal = 0.35; coat = 1.0; emit = vec3(0.0);
+  col = uBody; rough = 0.3; metal = 0.35; coat = 1.0;
 
   // underside
   if (n.y < -0.55 && v < 0.3) { col = uTyre; rough = 0.9; metal = 0.0; coat = 0.0; return; }
@@ -155,7 +176,7 @@ void livery(out vec3 col, out float rough, out float metal, out float coat, out 
   }
 
   // roof sign
-  if (v > 1.015) { col = uSign; rough = 0.4; metal = 0.0; coat = 0.3; emit = uSign * 0.5 * uLamps; return; }
+  if (v > 1.015) { col = uSign; rough = 0.4; metal = 0.0; coat = 0.3; return; }
 
   // glass: side windows behind the A-pillar, the windscreen, the tailgate window
   float top = 0.955;
@@ -170,7 +191,7 @@ void livery(out vec3 col, out float rough, out float metal, out float coat, out 
   // nose: slim headlamps rising to the corners, chrome bar, plate, dotted panel, corner vents, lower intake
   if (u < 0.09 && n.x > 0.3) {
     float lampBase = 0.545 + 0.03 * smoothstep(0.5, 0.92, az);
-    if (az > 0.5 && az < 0.93 && v > lampBase && v < lampBase + 0.045) { col = vec3(0.85); rough = 0.1; metal = 0.9; emit = vec3(1.0, 0.95, 0.85) * 1.5 * uLamps; return; }
+    if (az > 0.5 && az < 0.93 && v > lampBase && v < lampBase + 0.045) { col = vec3(0.85); rough = 0.1; metal = 0.9; return; }
     if (v > 0.585 && v < 0.61 && az < 0.5) { col = uChrome; rough = 0.15; metal = 1.0; return; }
     if (v > 0.255 && v < 0.35 && az < 0.25) { col = uPlate; rough = 0.5; metal = 0.0; coat = 0.2; return; }
     if (v > 0.1 && v < 0.24) { col = uTyre; rough = 0.6; metal = 0.2; return; }
@@ -184,7 +205,7 @@ void livery(out vec3 col, out float rough, out float metal, out float coat, out 
 
   // tail: lamps, plate, lower bumper
   if (u > 0.93 && n.x < -0.3) {
-    if (v > 0.56 && v < 0.66 && az > 0.45) { col = vec3(0.45, 0.02, 0.03); rough = 0.2; metal = 0.3; emit = vec3(1.0, 0.08, 0.1) * 1.6 * uLamps; return; }
+    if (v > 0.56 && v < 0.66 && az > 0.45) { col = vec3(0.45, 0.02, 0.03); rough = 0.2; metal = 0.3; return; }
     if (v > 0.38 && v < 0.47 && az < 0.25) { col = uPlate; rough = 0.5; metal = 0.0; return; }
     if (v < 0.3) { col = uTyre; rough = 0.7; metal = 0.1; return; }
   }
@@ -211,7 +232,6 @@ function liveryMaterial(d: Dims) {
     uDims: { value: new THREE.Vector4(d.front, d.len, d.roof, d.halfW) },
     uWheels: { value: new THREE.Vector4(d.wf, d.wr, d.rx, d.ry) },
     uRimZ: { value: d.rimZ },
-    uLamps: lampUniform,
     uDecalA: { value: decal(true) },
     uDecalB: { value: decal(false) },
   };
@@ -223,10 +243,9 @@ function liveryMaterial(d: Dims) {
         .replace("#include <begin_vertex>", "#include <begin_vertex>\nvCarP = transformed;\nvCarN = objectNormal;");
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", `#include <common>\n${LIVERY_GLSL}`)
-        .replace("#include <color_fragment>", "#include <color_fragment>\nvec3 carCol, carEmit; float carRough, carMetal, carCoat;\nlivery(carCol, carRough, carMetal, carCoat, carEmit);\ndiffuseColor.rgb = carCol;")
+        .replace("#include <color_fragment>", "#include <color_fragment>\nvec3 carCol; float carRough, carMetal, carCoat;\nlivery(carCol, carRough, carMetal, carCoat);\ndiffuseColor.rgb = carCol;")
         .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = carRough;")
         .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\nmetalnessFactor = carMetal;")
-        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += carEmit;")
         .replace("#include <lights_physical_fragment>", "#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat *= carCoat;\n#endif");
     };
     m.customProgramCacheKey = () => "livery-prime";

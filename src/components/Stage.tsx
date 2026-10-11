@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import gsap from "gsap";
 import type { Car } from "@/lib/fleet";
-import { buildCar, glowTex, lampUniform, loadCar, setLamps, type BuiltCar } from "@/lib/carModel";
+import { buildCar, glowTex, loadCar, type BuiltCar } from "@/lib/carModel";
 import { BACKDROP, backdropAnchor } from "@/lib/backdrop";
 
 /** Mutable turntable state shared between the HUD and the render loop. */
@@ -29,7 +29,6 @@ export interface Frame {
 interface StageProps {
   car: Car;
   accent: string;
-  lamps: boolean;
   /** Bumped when the car should roll in rather than appear in place. */
   rollKey: number;
   rig: Rig;
@@ -37,6 +36,12 @@ interface StageProps {
   /** Pixels of the canvas covered by HUD on each edge; the car must stay clear of them. */
   frame: Frame;
   theme: "dark" | "light";
+  /** Magnification over the fitted view (1 = fit). Below 1 only the car shrinks; the photo can't, or its edges would show. */
+  zoom: number;
+  /** Ask the HUD to multiply the zoom (wheel and pinch on the stage). */
+  onZoom: (factor: number) => void;
+  /** The backdrop photo's layer, scaled with the zoom so the car stays standing on its platform. */
+  backdrop: RefObject<HTMLDivElement | null>;
 }
 
 const YELLOW = new THREE.Color("#f5c518");
@@ -60,9 +65,8 @@ const THEME_SECONDS = 0.7;
 interface Holder {
   group: THREE.Group;
   wheels: THREE.Object3D[];
-  /** Faded copies of the car's materials, paired with their source so lamp changes carry over. */
-  ghosts: { ghost: THREE.Material; src: THREE.Material }[];
-  sprites: THREE.Sprite[];
+  /** Top of the model above the ground, metres. */
+  height: number;
 }
 
 /** Fade a material's alpha out with depth below the deck, like a reflection in polished stone.
@@ -88,14 +92,9 @@ function makeHolder(car: Car, built: BuiltCar): Holder {
   const fade = car.p.H * 0.6;
   const mirror = root.clone(true);
   mirror.scale.y = -1;
-  const ghosts: Holder["ghosts"] = [], sprites: THREE.Sprite[] = [], made = new Map<THREE.Material, THREE.Material>();
+  const made = new Map<THREE.Material, THREE.Material>(); // one faded copy per source material
   mirror.traverse((n) => {
-    if (n instanceof THREE.Sprite) {
-      n.material = n.material.clone();
-      n.material.opacity = 0.25;
-      n.visible = lampUniform.value > 0;
-      sprites.push(n);
-    } else if (n instanceof THREE.Mesh) {
+    if (n instanceof THREE.Mesh) {
       const src = n.material as THREE.Material;
       let ghost = made.get(src);
       if (!ghost) {
@@ -105,7 +104,6 @@ function makeHolder(car: Car, built: BuiltCar): Holder {
         ghost.opacity = REFLECT;
         fadeBelowDeck(ghost, fade);
         made.set(src, ghost);
-        ghosts.push({ ghost, src });
       }
       n.material = ghost;
     }
@@ -114,10 +112,10 @@ function makeHolder(car: Car, built: BuiltCar): Holder {
   group.add(root, mirror);
   const wheels: THREE.Object3D[] = [];
   group.traverse((n) => { if (n.name === "wheel") wheels.push(n); });
-  return { group, wheels, ghosts, sprites };
+  return { group, wheels, height: built.height };
 }
 
-function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }: StageProps) {
+function Scene({ car, accent, rollKey, rig, reduceMotion, frame, theme, zoom, backdrop }: StageProps) {
   const { camera, size, gl } = useThree();
   const hemi = useRef<THREE.HemisphereLight>(null);
   const key = useRef<THREE.DirectionalLight>(null);
@@ -137,7 +135,12 @@ function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }:
 
   const p = car.p;
   const reach = 0.5 * Math.hypot(p.L, p.W); // footprint radius while spinning
-  const view = useRef({ dist: 10, distT: 10, ox: 0, oxT: 0, oy: 0, oyT: 0, first: true });
+  // How tall the car on the platform really is (open doors, roof sign); the listed roof height until it's shown.
+  const [shown, setShown] = useState<{ id: string; height: number } | null>(null);
+  const top = shown?.id === car.id ? shown.height : p.H;
+  // dist/ox/oy frame the car at 100%; z is the eased zoom; px/py is the screen point zooming in centres on.
+  const view = useRef({ dist: 10, distT: 10, ox: 0, oxT: 0, oy: 0, oyT: 0, z: 1, px: 0, pxT: 0, py: 0, pyT: 0, first: true });
+  const photoScale = useRef({ s: 1, x: 0, y: 0 }); // last zoom applied to the photo layer, and its origin
 
   useEffect(() => {
     tweenColor(accentC.current, accent);
@@ -162,16 +165,6 @@ function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }:
     gsap.to(gl, { toneMappingExposure: L.exposure, duration: d, ease, overwrite: "auto" });
   }, [theme, gl, reduceMotion]);
 
-  useEffect(() => {
-    setLamps(lamps);
-    holders.forEach((h) => {
-      h.ghosts.forEach(({ ghost, src }) => {
-        if ("emissiveIntensity" in src) (ghost as THREE.MeshStandardMaterial).emissiveIntensity = (src as THREE.MeshStandardMaterial).emissiveIntensity;
-      });
-      h.sprites.forEach((s) => { s.visible = lamps; });
-    });
-  }, [lamps, holders, car]);
-
   // Stand the car on the photo's platform: aim the projection centre at the platform and size the car
   // to the ring, the gap between the side cards, and the room under the top overlay, whichever is tightest.
   useEffect(() => {
@@ -179,15 +172,18 @@ function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }:
     const W = size.width, H = size.height, a = backdropAnchor(W, H);
     const ppuRing = (a.r * 0.72) / reach;
     const ppuWide = Math.max(40, Math.min(a.x - frame.side, W - frame.side - a.x) - frame.gutter) / reach;
-    const ppuTall = Math.max(40, a.y - frame.top - 8) / (p.H + reach * Math.sin(BACKDROP.el));
+    const ppuTall = Math.max(40, a.y - frame.top - 8) / (top + reach * Math.sin(BACKDROP.el));
     const ppu = Math.min(ppuRing, ppuWide, ppuTall);
     const half = Math.tan(((cam.fov / 2) * Math.PI) / 180);
     const v = view.current;
     v.distT = H / (2 * half * ppu);
     v.oxT = -(a.x - W / 2);
     v.oyT = -(a.y - H / 2);
-    if (v.first) { v.dist = v.distT; v.ox = v.oxT; v.oy = v.oyT; v.first = false; }
-  }, [p, reach, camera, size, frame]);
+    // Zoom in around the middle of the car as it stands on screen, so it grows in place.
+    v.pxT = a.x;
+    v.pyT = a.y - top * ppu * 0.45;
+    if (v.first) { v.dist = v.distT; v.ox = v.oxT; v.oy = v.oyT; v.px = v.pxT; v.py = v.pyT; v.z = zoom; v.first = false; }
+  }, [p, reach, top, camera, size, frame]);
 
   // Swap the car in, rolling it onto the platform. Scanned models load first; sketched ones build at once.
   useEffect(() => {
@@ -204,6 +200,7 @@ function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }:
       if (!live) return;
       s.clear();
       s.add(holder.group);
+      setShown({ id: car.id, height: holder.height });
       holder.group.position.x = 0;
       if (!rollKey || reduceMotion) return;
       const d = Math.max(2.2, p.L * 0.42);
@@ -238,6 +235,9 @@ function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }:
     v.dist += (v.distT - v.dist) * k;
     v.ox += (v.oxT - v.ox) * k;
     v.oy += (v.oyT - v.oy) * k;
+    v.z += (zoom - v.z) * k;
+    v.px += (v.pxT - v.px) * k;
+    v.py += (v.pyT - v.py) * k;
     if (spinG.current) spinG.current.rotation.y = rig.yaw;
     if (glow.current) {
       const m = glow.current.material as THREE.MeshBasicMaterial;
@@ -245,10 +245,23 @@ function Scene({ car, accent, lamps, rollKey, rig, reduceMotion, frame, theme }:
       m.opacity = 0.45 + 0.4 * rig.pulse;
       glow.current.scale.setScalar((glow.current.userData.s ?? 1) * (1 + 0.08 * rig.pulse));
     }
+    // Zooming in magnifies the rendered image around (px, py): the camera renders a smaller window of its
+    // view (setViewOffset) and the photo is scaled by the same amount around the same point, so car and
+    // platform grow together. Zooming out instead backs the camera off; the car stays on the platform's
+    // centre and just gets smaller, since the photo can't shrink without showing its edges.
+    const W = state.size.width, H = state.size.height;
+    const zin = Math.max(1, v.z), d = v.dist / Math.min(1, v.z);
     const cam = state.camera as THREE.PerspectiveCamera;
-    cam.position.set(0, Math.sin(BACKDROP.el) * v.dist, Math.cos(BACKDROP.el) * v.dist);
+    cam.position.set(0, Math.sin(BACKDROP.el) * d, Math.cos(BACKDROP.el) * d);
     cam.lookAt(0, 0, 0);
-    cam.setViewOffset(state.size.width, state.size.height, v.ox, v.oy, state.size.width, state.size.height);
+    cam.setViewOffset(W, H, v.ox + v.px * (1 - 1 / zin), v.oy + v.py * (1 - 1 / zin), W / zin, H / zin);
+
+    const bd = backdrop.current, last = photoScale.current;
+    if (bd && (Math.abs(zin - last.s) > 1e-4 || (zin > 1.0001 && Math.hypot(v.px - last.x, v.py - last.y) > 0.25))) {
+      bd.style.transformOrigin = `${v.px}px ${v.py}px`;
+      bd.style.transform = zin > 1.0001 ? `scale(${zin})` : "";
+      photoScale.current = { s: zin, x: v.px, y: v.py };
+    }
   });
 
   return (
@@ -288,8 +301,34 @@ export default function Stage(props: StageProps) {
   const { rig } = props;
   const drag = useRef({ x: 0 });
   const wrap = useRef<HTMLDivElement>(null);
+  /** Fingers/pointers currently down on the stage, for pinch. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef(0);
+  const onZoom = useRef(props.onZoom);
+  onZoom.current = props.onZoom;
 
-  const end = () => {
+  // Wheel zooms. React's wheel listener is passive (can't stop the page scrolling), so attach our own.
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1); // lines/pages → pixels
+      onZoom.current(Math.exp(-dy * 0.0015));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const spread = () => {
+    const [a, b] = [...pointers.current.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  const release = (id: number) => {
+    if (!pointers.current.delete(id)) return;
+    if (pointers.current.size < 2) pinch.current = 0;
+    const [rest] = [...pointers.current.values()];
+    if (rest) { drag.current = { x: rest.x }; return; } // one finger left after a pinch: carry on turning
     rig.dragging = false;
     wrap.current?.removeAttribute("data-drag");
     rig.lastInput = performance.now();
@@ -300,24 +339,36 @@ export default function Stage(props: StageProps) {
       ref={wrap}
       className="absolute inset-0 cursor-grab touch-pan-y data-[drag=true]:cursor-grabbing"
       role="img"
-      aria-label={`3D model of the ${props.car.maker} ${props.car.model}. Drag to rotate.`}
+      aria-label={`3D model of the ${props.car.maker} ${props.car.model}. Drag to rotate, scroll or pinch to zoom.`}
       onPointerDown={(e) => {
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+        if (pointers.current.size === 2) { pinch.current = spread(); return; }
         rig.dragging = true;
         gsap.killTweensOf(rig, "yaw");
         wrap.current?.setAttribute("data-drag", "true");
-        try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
         drag.current = { x: e.clientX };
       }}
       onPointerMove={(e) => {
+        const pt = pointers.current.get(e.pointerId);
+        if (!pt) return;
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        if (pointers.current.size >= 2) {
+          const d = spread();
+          if (pinch.current > 0 && d > 0) onZoom.current(d / pinch.current);
+          pinch.current = d;
+          return;
+        }
         if (!rig.dragging) return;
         // Turn only: the camera's height is fixed to match the photo behind.
         rig.yaw += (e.clientX - drag.current.x) * 0.009;
         drag.current = { x: e.clientX };
         rig.lastInput = performance.now();
       }}
-      onPointerUp={end}
-      onPointerCancel={end}
-      onLostPointerCapture={end}
+      onPointerUp={(e) => release(e.pointerId)}
+      onPointerCancel={(e) => release(e.pointerId)}
+      onLostPointerCapture={(e) => release(e.pointerId)}
     >
       <Canvas
         dpr={[1, 2]}

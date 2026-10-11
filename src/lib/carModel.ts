@@ -26,34 +26,18 @@ function makeMats() {
     rim: std({ color: "#b9c0c9", metalness: 0.9, roughness: 0.3 }),
     chrome: std({ color: "#e6eaef", metalness: 1, roughness: 0.12 }),
     pod: std({ color: "#c9d0d8", metalness: 0.2, roughness: 0.6 }),
-    head: std({ color: "#dfe6ee", emissive: "#fff0cc", emissiveIntensity: 2.4, roughness: 0.3 }),
-    tail: std({ color: "#3a0508", emissive: "#ff1a2c", emissiveIntensity: 1.8, roughness: 0.4 }),
-    signB: std({ color: "#cfe8ff", emissive: "#8fd0ff", emissiveIntensity: 1.6, roughness: 0.5 }),
-    signS: std({ color: "#f1f4f7", emissive: "#f1f4f7", emissiveIntensity: 1.2, roughness: 0.5 }),
+    // lamps and roof signs are unlit, with just enough emission to read as lenses
+    head: std({ color: "#dfe6ee", emissive: "#fff0cc", emissiveIntensity: 0.12, roughness: 0.3 }),
+    tail: std({ color: "#3a0508", emissive: "#ff1a2c", emissiveIntensity: 0.25, roughness: 0.4 }),
+    signB: std({ color: "#cfe8ff", emissive: "#8fd0ff", emissiveIntensity: 0.2, roughness: 0.5 }),
+    signS: std({ color: "#f1f4f7", emissive: "#f1f4f7", emissiveIntensity: 0.15, roughness: 0.5 }),
     plateY: std({ color: "#f5c518", roughness: 0.6 }),
     plateW: std({ color: "#f2f3f5", roughness: 0.6 }),
-    glow: new THREE.SpriteMaterial({
-      map: glowTex("rgba(255,244,210,1)", "rgba(255,220,150,.35)"),
-      blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.85,
-    }),
     paints: {} as Record<string, THREE.MeshPhysicalMaterial>,
   };
 }
 export function getMats() {
   return (mats ??= makeMats());
-}
-
-/** Shared with the scanned models' livery shader, which lights its lamps from it. */
-export const lampUniform = { value: 1 };
-
-export function setLamps(on: boolean) {
-  lampUniform.value = on ? 1 : 0;
-  const M = getMats();
-  M.head.emissiveIntensity = on ? 2.4 : 0.12;
-  M.tail.emissiveIntensity = on ? 1.8 : 0.25;
-  M.signB.emissiveIntensity = on ? 1.6 : 0.2;
-  M.signS.emissiveIntensity = on ? 1.2 : 0.15;
-  M.glow.opacity = on ? 0.85 : 0;
 }
 
 function paintMat(hex: string) {
@@ -110,6 +94,8 @@ export interface BuiltCar {
   /** The whole car; slide this for the roll-in. Clone it to show the car in a second scene. */
   root: THREE.Group;
   wheels: THREE.Object3D[];
+  /** Highest point above the ground in metres (roof sign, open doors and all), for camera framing. */
+  height: number;
 }
 
 const cache: Record<string, BuiltCar> = {};
@@ -211,14 +197,9 @@ export function buildCar(car: Car): BuiltCar {
     w.position.set(X(ax), p.wr, s * (Wd / 2 - p.tw / 2 + 0.004));
     g.add(w);
   }));
-  sides.forEach((s) => {
-    const sp = new THREE.Sprite(M.glow);
-    sp.scale.setScalar(p.bus ? 1.1 : 0.6);
-    sp.position.set(X(-0.07), hy, s * hz);
-    g.add(sp);
-  });
 
   const wheels: THREE.Object3D[] = [];
   g.traverse((n) => { if (n.name === "wheel") wheels.push(n); });
-  return (cache[car.id] = { root: g, wheels });
+  g.updateMatrixWorld(true);
+  return (cache[car.id] = { root: g, wheels, height: new THREE.Box3().setFromObject(g).max.y });
 }

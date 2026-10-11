@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { CARS, CLASSES, ORDER, STATS, traits, type FilterKey, type StatKey } from "@/lib/fleet";
+import { CARS, CLASSES, ORDER, STATS, type FilterKey, type StatKey } from "@/lib/fleet";
 import SideView from "./SideView";
 import Image from "next/image";
 import { Icon, StarFill, type IconName } from "./Icon";
@@ -12,18 +12,20 @@ import type { Frame, Rig } from "./Stage";
 import { backdropStyle } from "@/lib/backdrop";
 import { applyTheme, resolveTheme, type Theme } from "@/lib/theme";
 
-gsap.registerPlugin(useGSAP);
+gsap.registerPlugin(useGSAP); 
 
 const Stage = dynamic(() => import("./Stage"), { ssr: false });
 
 const STORE = "bluebird-fleet-select";
 const ANG = { front: -Math.PI / 2, side: 0, rear: Math.PI / 2 } as const;
+/** Vehicle zoom: range over the fitted view, and the factor per button press or key. */
+const ZOOM = { min: 0.75, max: 2.5, step: 1.25 };
 type ViewKey = keyof typeof ANG;
 const pad = (n: number) => (n < 10 ? "0" : "") + n;
 
-/** Each service's badge (public/icons). All and Prime wear the Bluebird badge; Heritage the old outline logo. */
+/** Each service's badge (public/icons). All wears the Bluebird badge; Heritage the old outline logo. */
 const CLASS_BADGE: Record<FilterKey, string> = {
-  all: "bluebird", bluebird: "bluebird", prime: "bluebird", silverbird: "silverbird", goldenbird: "goldenbird",
+  all: "bluebird", bluebird: "bluebird", silverbird: "silverbird", goldenbird: "goldenbird",
   bigbird: "bigbird", cititrans: "cititrans", heritage: "heritage",
 };
 const STAT_ICON: Record<StatKey, IconName> = { cap: "seat", comfort: "sofa", eco: "leaf", agile: "city" };
@@ -55,9 +57,9 @@ export default function Garage() {
   const [cur, setCur] = useState(0);
   const [pick, setPick] = useState<string | null>(null);
   const [spin, setSpin] = useState(true);
-  const [lamps, setLamps] = useState(true);
   const [focus, setFocus] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [theme, setTheme] = useState<Theme>("dark");
   const [rollKey, setRollKey] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -78,6 +80,7 @@ export default function Garage() {
   const titleRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const overallRef = useRef<HTMLSpanElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
@@ -116,7 +119,6 @@ export default function Garage() {
         const li = CARS.findIndex((c) => c.id === saved.last);
         if (li >= 0) setCur(li);
       }
-      if (saved.lamps === false) setLamps(false);
       if (saved.spin === false) spinOn = false;
     } catch {}
     const hi = CARS.findIndex((c) => c.id === location.hash.slice(1));
@@ -129,9 +131,9 @@ export default function Garage() {
   useEffect(() => {
     if (!loaded) return;
     try {
-      localStorage.setItem(STORE, JSON.stringify({ pick, last: car.id, lamps, spin }));
+      localStorage.setItem(STORE, JSON.stringify({ pick, last: car.id, spin }));
     } catch {}
-  }, [loaded, pick, car.id, lamps, spin]);
+  }, [loaded, pick, car.id, spin]);
 
   useEffect(() => {
     rig.spin = spin;
@@ -152,10 +154,13 @@ export default function Garage() {
   }, [gl]);
 
   /* ---------- actions ---------- */
+  const zoomBy = useCallback((f: number) => setZoom((z) => Math.min(ZOOM.max, Math.max(ZOOM.min, z * f))), []);
+
   const goTo = useCallback((i: number) => {
     if (i === cur) return;
     setCur(i);
     setRollKey((k) => k + 1);
+    setZoom(1); // each car arrives framed to fit
   }, [cur]);
 
   const step = useCallback(
@@ -198,10 +203,13 @@ export default function Garage() {
       else if (e.key === "Enter" && !onButton) { togglePick(); e.preventDefault(); }
       else if ((e.key === "f" || e.key === "F") && isLg) setFocus((f) => !f);
       else if (e.key === "Escape") { setMenu(false); setFocus(false); }
+      else if (e.key === "+" || e.key === "=") zoomBy(ZOOM.step);
+      else if (e.key === "-" || e.key === "_") zoomBy(1 / ZOOM.step);
+      else if (e.key === "0") setZoom(1);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [step, togglePick, isLg]);
+  }, [step, togglePick, isLg, zoomBy]);
 
   useEffect(() => {
     if (!menu) return;
@@ -339,7 +347,10 @@ export default function Garage() {
     gsap.fromTo(stampRef.current, { scale: 1.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "back.out(2.2)" });
   }, { dependencies: [picked, cur, reduce] });
 
-  const toolbar = { spin, lamps, onAim: aim, onSpin: () => setSpin((s) => !s), onLamps: () => setLamps((l) => !l) };
+  const toolbar = {
+    spin, zoom, onAim: aim, onSpin: () => setSpin((s) => !s),
+    onZoomIn: () => zoomBy(ZOOM.step), onZoomOut: () => zoomBy(1 / ZOOM.step), onZoomReset: () => setZoom(1),
+  };
 
   /* ---------- render ---------- */
   return (
@@ -351,13 +362,10 @@ export default function Garage() {
       {/* One row from tablet up: logo | filter pills (scroll sideways if they run out of room) | counter.
           Phones put the pills on a row of their own. */}
       <header className="relative z-30 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-b border-edge bg-[linear-gradient(180deg,var(--hdr-a),var(--hdr-b))] px-gut shadow-[0_8px_30px_-12px_var(--drop)] backdrop-blur-md md:flex md:gap-x-2 2xl:gap-x-5">
-        <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2.5 py-2.5 md:flex-none" aria-label="Bluebird Group Bird Garage">
+        <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2.5 py-2.5 md:flex-none" aria-label="Bird Garage">
           <Image src="/icons/bluebird.png" alt="" width={44} height={44} loading="eager" className="h-9 w-9 drop-shadow-[0_2px_10px_rgba(61,139,255,.45)] 2xl:h-11 2xl:w-11" />
-          <span className="flex flex-col">
-            <span className="font-display text-[11px] font-bold italic uppercase leading-none tracking-[.12em] text-(--kicker) 2xl:text-[13px]">Bluebird Group</span>
-            <span className="mt-0.5 whitespace-nowrap bg-gradient-to-b from-(--title-a) to-(--title-b) bg-clip-text font-display text-[21px] font-extrabold italic uppercase leading-[.95] tracking-[.02em] text-transparent sm:text-[24px] xl:text-[28px] 2xl:text-[32px]">
-              Bird Garage
-            </span>
+          <span className="whitespace-nowrap bg-gradient-to-b from-(--title-a) to-(--title-b) bg-clip-text pr-1 font-display text-[21px] font-extrabold italic uppercase leading-none tracking-[.02em] -translate-y-[.12em] text-transparent sm:text-[24px] xl:text-[28px] 2xl:text-[32px]">
+            Bird Garage
           </span>
         </a>
 
@@ -382,12 +390,10 @@ export default function Garage() {
                 focus={focus}
                 canFocus={isLg}
                 spin={spin}
-                lamps={lamps}
                 light={theme === "light"}
                 onTheme={toggleTheme}
                 onFocus={() => { setFocus((f) => !f); setMenu(false); }}
                 onSpin={() => setSpin((s) => !s)}
-                onLamps={() => setLamps((l) => !l)}
               />
             )}
           </div>
@@ -420,7 +426,7 @@ export default function Garage() {
                   height={22}
                   className={`h-[18px] w-[18px] 2xl:h-[22px] 2xl:w-[22px] ${on ? "drop-shadow-[0_0_1.5px_rgba(255,255,255,.95)]" : ""}`}
                 />
-                {k === "all" ? "All" : CLASSES[k].pill ?? CLASSES[k].name}
+                {k === "all" ? "All" : CLASSES[k].name}
               </button>
             );
           })}
@@ -438,11 +444,17 @@ export default function Garage() {
           style={{ "--inset": `${inset}px` } as CSSProperties}
           className="relative col-start-2 row-start-1 min-h-[clamp(360px,60vh,480px)] min-w-0 overflow-hidden rounded-2xl border border-edge bg-night lg:absolute lg:inset-0 lg:col-start-auto lg:row-start-auto lg:min-h-0 lg:rounded-none lg:border-0"
         >
-          {/* night and day photos, cross-faded by data-theme (both load up front, so the first switch doesn't flash) */}
-          <div aria-hidden="true" style={backdropStyle("dark")} className="absolute inset-0 transition-opacity duration-700 ease-[cubic-bezier(.4,0,.2,1)] light:opacity-0" />
-          <div aria-hidden="true" style={backdropStyle("light")} className="absolute inset-0 opacity-0 transition-opacity duration-700 ease-[cubic-bezier(.4,0,.2,1)] light:opacity-100" />
+          {/* night and day photos, cross-faded by data-theme (both load up front, so the first switch doesn't flash);
+              the stage scales this layer with the zoom */}
+          <div ref={backdropRef} aria-hidden="true" className="absolute inset-0 will-change-transform">
+            <div style={backdropStyle("dark")} className="absolute inset-0 transition-opacity duration-700 ease-[cubic-bezier(.4,0,.2,1)] light:opacity-0" />
+            <div style={backdropStyle("light")} className="absolute inset-0 opacity-0 transition-opacity duration-700 ease-[cubic-bezier(.4,0,.2,1)] light:opacity-100" />
+          </div>
           {gl && (
-            <Stage car={car} accent={cl.accent} lamps={lamps} rollKey={rollKey} rig={rig} reduceMotion={reduce} frame={frame} theme={theme} />
+            <Stage
+              car={car} accent={cl.accent} rollKey={rollKey} rig={rig} reduceMotion={reduce} frame={frame} theme={theme}
+              zoom={zoom} onZoom={zoomBy} backdrop={backdropRef}
+            />
           )}
           {gl === false && (
             <>
@@ -476,8 +488,9 @@ export default function Garage() {
               gl && (
                 <p className="flex items-center gap-2 whitespace-nowrap rounded-full bg-(--float) px-3 py-1.5 md:px-3.5 text-[10px] font-medium uppercase leading-[1.3] tracking-[.16em] text-soft backdrop-blur-sm md:text-xs">
                   <Icon name="hand" className="h-4 w-4 flex-none md:h-5 md:w-5" />
-                  <span className="lg:hidden">Drag to rotate</span>
-                  <span className="hidden lg:inline">Drag the car to rotate it</span>
+                  <span className="sm:hidden">Drag · Pinch</span>
+                  <span className="hidden sm:inline lg:hidden">Drag to rotate · Pinch to zoom</span>
+                  <span className="hidden lg:inline">Drag to rotate · Scroll to zoom</span>
                 </p>
               )
             )}
@@ -524,51 +537,56 @@ export default function Garage() {
         <section
           ref={identRef}
           aria-live="polite"
-          className="glass relative z-10 col-start-1 row-start-1 flex min-w-0 flex-col overflow-hidden rounded-2xl p-3 sm:p-4 md:p-5 xl:p-6"
+          className="glass relative z-10 col-start-1 row-start-1 flex min-w-0 flex-col overflow-hidden rounded-2xl p-3 [--gap:clamp(8px,calc(4vh_-_17px),24px)] sm:p-4 md:p-5 lg:p-4 xl:p-5 2xl:p-6"
         >
-          <p
-            data-anim
-            className="mb-3 inline-flex items-center gap-2 self-start bg-accent px-3 pb-[5px] pr-5 pt-1.5 text-[10px] font-semibold uppercase leading-none tracking-[.16em] text-(--on-accent) transition-colors duration-300 [clip-path:polygon(6px_0,100%_0,calc(100%-8px)_100%,0_100%)] md:text-xs"
-          >
-            {cl.name}
-            <span className="hidden items-center gap-2 sm:inline-flex"><span className="opacity-60">•</span> {cl.role}</span>
-          </p>
-          <p data-anim className="text-xs font-semibold uppercase leading-none tracking-[.24em] text-soft md:text-[15px]">{car.maker}</p>
+          {/* service pill, with its role beside it (the role drops below the pill if the card is too narrow) */}
+          <div data-anim className="mb-(--gap) flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <p className="rounded-md bg-accent px-2.5 py-[5px] text-[10px] font-semibold uppercase leading-none tracking-[.1em] text-(--on-accent) shadow-[0_0_16px_color-mix(in_srgb,var(--accent)_30%,transparent)] transition-colors duration-300 md:text-[11px]">
+              {cl.name}
+            </p>
+            <p className="hidden text-xs leading-none text-soft sm:block md:text-[13px]">{cl.role}</p>
+          </div>
+          <p data-anim className="text-sm font-medium uppercase leading-none tracking-[.1em] text-soft md:text-lg 2xl:text-[22px]">{car.maker}</p>
           <h2
             ref={modelRef}
-            className="mb-3 mt-2 font-display text-[clamp(28px,8vw,52px)] font-extrabold italic uppercase leading-[.88] tracking-[.005em] [text-wrap:balance] lg:text-[clamp(44px,4.3vw,66px)]"
+            className="mb-(--gap) mt-1.5 font-hud text-[clamp(28px,8vw,52px)] font-semibold leading-[1.02] tracking-[-.01em] [text-wrap:balance] lg:text-[clamp(38px,3.6vw,64px)]"
           >
             {car.model}
           </h2>
-          <p data-anim className="mb-4 max-w-[42ch] text-[12.5px] leading-[1.5] text-soft md:text-[15px]">{car.blurb}</p>
+          <p data-anim className="max-w-[42ch] pb-(--gap) text-[12.5px] leading-[1.55] text-soft md:text-[15px] lg:text-sm lg:leading-normal 2xl:text-base 2xl:leading-[1.6]">{car.blurb}</p>
 
-          <dl data-anim className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {/* specs: two columns under a hairline, split by a short rule (phones stack them); on a tall card they
+              centre in the spare room and the service footer drops to the bottom */}
+          <dl data-anim className="my-auto grid grid-cols-1 border-t border-edge sm:grid-cols-2">
             {([
               ["Body", car.body, "car"],
               ["Seats", car.seats, "users"],
               ["Power", car.power, "bolt"],
-              ["Fleet note", car.note, "calendar"],
-            ] as const).map(([k, v, icon]) => (
-              <div key={k} className="flex items-center gap-2.5 rounded-xl border border-edge bg-(--tile) p-2 md:p-2.5">
-                <span className="hidden h-9 w-9 flex-none place-items-center rounded-full border border-edge bg-(--icon-bg) text-(--icon) sm:grid lg:hidden xl:grid">
-                  <Icon name={icon} className="h-[18px] w-[18px]" />
-                </span>
-                <div className="min-w-0">
-                  <dt className="text-[9.5px] font-semibold uppercase leading-[1.6] tracking-[.16em] text-dim md:text-[10px]">{k}</dt>
-                  <dd className="text-[12.5px] leading-snug md:text-[13px]">{v}</dd>
-                </div>
+              ["Length", `${+car.p.L.toFixed(2)} m`, "ruler"],
+            ] as const).map(([k, v, icon], i) => (
+              <div
+                key={k}
+                className={`relative min-w-0 py-[clamp(9px,1.35vh,16px)] ${i ? "border-t border-edge" : ""} ${i === 1 ? "sm:border-t-0" : ""} ${i % 2 ? "sm:pl-[46px] sm:before:absolute sm:before:inset-y-3 sm:before:left-0 sm:before:w-px sm:before:bg-edge" : "sm:pl-[30px] sm:pr-3"}`}
+              >
+                <dt className="text-[10px] font-medium uppercase leading-none tracking-[.1em] text-dim md:text-[11px] 2xl:text-xs">
+                  <Icon name={icon} className={`absolute top-[calc(clamp(9px,1.35vh,16px)+1px)] hidden h-5 w-5 text-soft sm:block ${i % 2 ? "left-4" : "left-0"}`} />
+                  {k}
+                </dt>
+                <dd className="mt-1.5 text-[13px] leading-snug md:text-sm 2xl:text-[15px]">{v}</dd>
               </div>
             ))}
           </dl>
 
-          <ul data-anim className="mt-3 hidden grid-cols-3 rounded-xl border border-edge bg-(--tile) py-3 sm:grid lg:mt-auto">
-            {traits(car).map((t, i) => (
-              <li key={t.label} className={`flex flex-col items-center gap-1.5 px-1 text-center ${i ? "border-l border-edge" : ""}`}>
-                <Icon name={t.icon} className="h-6 w-6 text-accent transition-colors duration-300" />
-                <span className="text-[11px] font-semibold leading-tight md:text-xs">{t.label}</span>
-              </li>
-            ))}
-          </ul>
+          {/* service footer: badge, name and the car's place in the fleet */}
+          <div data-anim className="flex items-center gap-3 border-t border-edge pt-(--gap)">
+            <span className="hidden h-10 w-10 flex-none place-items-center rounded-full border border-edge bg-(--icon-bg) sm:grid 2xl:h-14 2xl:w-14">
+              <Image src={`/icons/${CLASS_BADGE[car.cls]}.png`} alt="" width={32} height={32} className="h-7 w-7 object-contain 2xl:h-8 2xl:w-8" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight 2xl:text-[15px]">{cl.name}</p>
+              <p className="mt-0.5 text-xs leading-snug text-soft 2xl:text-[13px]">{car.note}</p>
+            </div>
+          </div>
         </section>
 
         {/* phone: the view tools sit in their own row so they don't cover the car */}
@@ -577,71 +595,79 @@ export default function Garage() {
         {/* ----- ratings card ----- */}
         <section
           ref={ratingsRef}
-          className="glass relative z-10 col-span-2 row-start-3 flex min-w-0 flex-col rounded-2xl p-4 md:row-start-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,300px)] md:gap-x-8 md:p-5 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:flex xl:p-6"
+          className="glass relative z-10 col-span-2 row-start-3 flex min-w-0 flex-col rounded-2xl p-4 [--gap:clamp(12px,2.2vh,24px)] md:row-start-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,300px)] md:gap-x-8 md:p-5 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:flex lg:p-4 xl:p-5 2xl:p-6"
         >
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-[rgba(245,197,24,.12)] text-plate">
-                <StarFill className="h-6 w-6 drop-shadow-[0_0_8px_rgba(245,197,24,.6)]" />
+          <div className="lg:flex lg:flex-1 lg:flex-col">
+            {/* overall score: a gold-ringed star, the number and five stars */}
+            <div className="flex items-center gap-3.5">
+              <span className="grid h-12 w-12 flex-none place-items-center rounded-full border-2 border-[rgba(245,197,24,.7)] bg-[rgba(245,197,24,.08)] text-plate shadow-[0_0_18px_rgba(245,197,24,.22)] 2xl:h-14 2xl:w-14">
+                <StarFill className="h-6 w-6 drop-shadow-[0_0_8px_rgba(245,197,24,.6)] 2xl:h-7 2xl:w-7" />
               </span>
-              <div>
-                <p className="text-[11px] font-semibold uppercase leading-none tracking-[.18em] text-soft">Overall rating</p>
-                <p className="mt-1 flex items-baseline gap-1.5 leading-none">
-                  <span ref={overallRef} className="font-display text-[38px] font-bold tabular-nums">{firstOverall}</span>
-                  <span className="text-sm text-dim">/ 10</span>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase leading-none tracking-[.16em] text-soft md:text-xs">
+                  Overall rating
+                  <span title="Ratings are this site's, for fun." className="text-dim">
+                    <Icon name="info" className="h-3.5 w-3.5" />
+                    <span className="sr-only">(ratings are this site&apos;s, for fun)</span>
+                  </span>
                 </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="flex items-baseline gap-1 leading-none">
+                    <span ref={overallRef} className="text-[34px] font-semibold tabular-nums 2xl:text-[40px]">{firstOverall}</span>
+                    <span className="text-sm text-dim">/10</span>
+                  </p>
+                  <Stars value={overall / 2} />
+                </div>
               </div>
             </div>
-            <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-(--track)">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#2f8bff] to-accent shadow-[0_0_10px_var(--accent)] transition-[width] duration-500" style={{ width: `${overall * 10}%` }} />
-            </div>
 
-            <div className="mt-4 grid gap-x-8 border-t border-edge pt-4 sm:grid-cols-2 lg:grid-cols-1">
+            {/* one row per rating: label and score, then its bar; the rows spread out on a tall card */}
+            <div className="mt-(--gap) grid gap-x-8 gap-y-[clamp(14px,2.4vh,26px)] border-t border-edge pt-(--gap) sm:grid-cols-2 lg:flex lg:flex-1 lg:flex-col lg:justify-evenly">
               {STATS.map(([k, label]) => {
                 const v = car.r[k];
                 return (
-                  <div key={k} className="mb-3.5 flex items-center gap-3">
-                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full border border-edge bg-(--icon-bg) text-(--icon)">
+                  <div key={k} className="flex items-center gap-3.5">
+                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full border border-edge bg-(--icon-bg) text-(--icon) 2xl:h-11 2xl:w-11">
                       <Icon name={STAT_ICON[k]} className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <span className="text-[11px] font-semibold uppercase leading-none tracking-[.14em] md:text-xs">{label}</span>
-                      <div aria-hidden="true" className="mt-2 h-2 overflow-hidden rounded-full bg-(--track)">
+                      <p className="flex items-baseline justify-between gap-2 leading-none">
+                        <span className="text-[11px] font-semibold uppercase tracking-[.12em] md:text-xs">{label}</span>
+                        <span className="whitespace-nowrap tabular-nums">
+                          <b className="text-[15px] font-semibold">{v}</b> <span className="text-[11px] text-dim">/10</span>
+                        </span>
+                      </p>
+                      <div aria-hidden="true" className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-(--track)">
                         <div className="h-full rounded-full bg-accent shadow-[0_0_10px_var(--accent)] transition-[width,background-color] duration-500 ease-out" style={{ width: `${v * 10}%` }} />
                       </div>
                     </div>
-                    <span className="w-6 text-right font-display text-xl font-bold leading-none text-accent tabular-nums transition-colors duration-300">{v}</span>
                   </div>
                 );
               })}
             </div>
-            <p className="flex gap-2.5 border-t border-edge pt-3.5 text-[12.5px] leading-snug text-soft">
-              <Icon name="info" className="mt-px h-[18px] w-[18px] flex-none text-dim" />
-              <span>
-                {cl.best} <span className="text-dim">Ratings are this site&apos;s, for fun.</span>
-              </span>
-            </p>
           </div>
 
-          <div className="mt-5 md:mt-0 md:self-center lg:mt-auto lg:self-auto lg:pt-5">
+          <div className="mt-5 md:mt-0 md:self-center lg:mt-(--gap) lg:self-auto lg:border-t lg:border-edge lg:pt-(--gap)">
             <button
               aria-pressed={picked}
               onClick={togglePick}
-              className={`flex h-14 w-full items-center justify-center gap-2.5 rounded-xl font-display text-[22px] font-bold uppercase tracking-[.06em] transition-[filter,box-shadow] md:text-2xl ${picked ? "bg-[linear-gradient(180deg,#ffd84a,#f5b50f)] text-[#14140f] shadow-[0_0_28px_rgba(245,197,24,.45),inset_0_1px_0_rgba(255,255,255,.5)]" : "bg-[linear-gradient(180deg,#ffd84a,#f5b50f)] text-[#14140f] shadow-[0_0_18px_rgba(245,197,24,.25),inset_0_1px_0_rgba(255,255,255,.5)] hover:brightness-110"}`}
+              className={`flex h-14 w-full items-center justify-center gap-2.5 rounded-xl text-lg font-semibold uppercase tracking-[.08em] transition-[filter,box-shadow] md:text-xl ${picked ? "bg-[linear-gradient(180deg,#ffd84a,#f5b50f)] text-[#14140f] shadow-[0_0_28px_rgba(245,197,24,.45),inset_0_1px_0_rgba(255,255,255,.5)]" : "bg-[linear-gradient(180deg,#ffd84a,#f5b50f)] text-[#14140f] shadow-[0_0_18px_rgba(245,197,24,.25),inset_0_1px_0_rgba(255,255,255,.5)] hover:brightness-110"}`}
             >
               {picked && <Icon name="check" className="h-6 w-6" strokeWidth={3} />}
               {picked ? "Selected" : "Select this car"}
+              {!picked && <Icon name="arrowRight" className="h-5 w-5" strokeWidth={2.4} />}
             </button>
-            <div className="mt-3 flex items-center justify-center divide-x divide-edge text-[11px] font-semibold uppercase tracking-[.12em] md:text-xs">
-              <button onClick={() => step(1)} className="flex items-center gap-2 whitespace-nowrap px-3 py-1.5 text-soft transition-colors hover:text-ink xl:px-4">
-                <Icon name="swap" className="h-[18px] w-[18px]" /> Change car
+            <div className="mt-3 flex items-center justify-center gap-1 text-xs text-dim">
+              <button onClick={() => step(1)} className="flex items-center gap-1.5 whitespace-nowrap px-2 py-1 transition-colors hover:text-ink">
+                <Icon name="swap" className="h-4 w-4" /> Change car
               </button>
+              <span aria-hidden="true">•</span>
               <button
                 onClick={() => setPick(null)}
                 disabled={!pick}
-                className="flex items-center gap-2 whitespace-nowrap px-3 py-1.5 text-soft transition-colors enabled:hover:text-ink disabled:opacity-40 xl:px-4"
+                className="flex items-center gap-1.5 whitespace-nowrap px-2 py-1 transition-colors enabled:hover:text-ink disabled:opacity-50"
               >
-                <Icon name="x" className="h-[18px] w-[18px]" /> Clear pick
+                <Icon name="x" className="h-4 w-4" /> Clear pick
               </button>
             </div>
           </div>
@@ -698,11 +724,30 @@ export default function Garage() {
 
 /* ---------- pieces ---------- */
 
+/** Five stars, gold up to `value` (0–5) over dim ones. */
+function Stars({ value }: { value: number }) {
+  const row = (cls: string) => (
+    <span className={`flex gap-0.5 ${cls}`}>
+      {[0, 1, 2, 3, 4].map((i) => <StarFill key={i} className="h-3.5 w-3.5 flex-none" />)}
+    </span>
+  );
+  return (
+    <span aria-hidden="true" className="relative inline-flex">
+      {row("text-[color-mix(in_srgb,var(--dim)_40%,transparent)]")}
+      <span className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-500" style={{ width: `${value * 20}%` }}>
+        {row("text-plate")}
+      </span>
+    </span>
+  );
+}
+
 /** Camera presets and display toggles in one pill. Labels only where the stage is wide enough. */
-function Toolbar({ spin, lamps, onAim, onSpin, onLamps, className }: {
-  spin: boolean; lamps: boolean; onAim: (v: ViewKey) => void; onSpin: () => void; onLamps: () => void; className?: string;
+function Toolbar({ spin, zoom, onAim, onSpin, onZoomIn, onZoomOut, onZoomReset, className }: {
+  spin: boolean; zoom: number; onAim: (v: ViewKey) => void; onSpin: () => void;
+  onZoomIn: () => void; onZoomOut: () => void; onZoomReset: () => void; className?: string;
 }) {
   const sep = <span aria-hidden="true" className="h-5 w-px bg-edge" />;
+  const zoomBtn = "grid h-9 w-9 place-items-center rounded-full text-soft transition-colors hover:text-ink disabled:opacity-35 disabled:hover:text-soft md:h-10 md:w-10";
   return (
     <div className={`items-center rounded-full border border-edge bg-(--float) p-1 shadow-[0_10px_30px_-10px_var(--drop)] backdrop-blur-md ${className ?? ""}`}>
       {(Object.keys(ANG) as ViewKey[]).map((v) => (
@@ -713,7 +758,22 @@ function Toolbar({ spin, lamps, onAim, onSpin, onLamps, className }: {
       ))}
       <ToolButton icon="spin" pressed={spin} onClick={onSpin}>Spin</ToolButton>
       {sep}
-      <ToolButton icon="bulb" pressed={lamps} onClick={onLamps}>Lights</ToolButton>
+      <span role="group" aria-label="Zoom" className="flex items-center">
+        <button onClick={onZoomOut} disabled={zoom <= ZOOM.min + 1e-3} aria-label="Zoom out" title="Zoom out (−)" className={zoomBtn}>
+          <Icon name="zoomOut" className="h-[18px] w-[18px]" />
+        </button>
+        <button
+          onClick={onZoomReset}
+          aria-label={`Zoom ${Math.round(zoom * 100)}%, reset to fit`}
+          title="Fit (0)"
+          className="hidden h-9 w-12 rounded-full text-[11px] font-semibold tabular-nums text-soft transition-colors hover:text-ink sm:block md:h-10 xl:text-xs"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button onClick={onZoomIn} disabled={zoom >= ZOOM.max - 1e-3} aria-label="Zoom in" title="Zoom in (+)" className={zoomBtn}>
+          <Icon name="zoomIn" className="h-[18px] w-[18px]" />
+        </button>
+      </span>
     </div>
   );
 }
@@ -787,9 +847,9 @@ function RosterArrow({ dir, strip }: { dir: 1 | -1; strip: RefObject<HTMLDivElem
   );
 }
 
-function Menu({ focus, canFocus, spin, lamps, light, onFocus, onSpin, onLamps, onTheme }: {
-  focus: boolean; canFocus: boolean; spin: boolean; lamps: boolean; light: boolean;
-  onFocus: () => void; onSpin: () => void; onLamps: () => void; onTheme: () => void;
+function Menu({ focus, canFocus, spin, light, onFocus, onSpin, onTheme }: {
+  focus: boolean; canFocus: boolean; spin: boolean; light: boolean;
+  onFocus: () => void; onSpin: () => void; onTheme: () => void;
 }) {
   const row = "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(47,139,255,.12)]";
   const sw = (on: boolean) => (
@@ -813,10 +873,6 @@ function Menu({ focus, canFocus, spin, lamps, light, onFocus, onSpin, onLamps, o
         <span className="flex items-center gap-2.5"><Icon name="spin" className="h-[18px] w-[18px] text-(--icon)" /> Auto-spin</span>
         {sw(spin)}
       </button>
-      <button className={row} onClick={onLamps} role="menuitemcheckbox" aria-checked={lamps}>
-        <span className="flex items-center gap-2.5"><Icon name="bulb" className="h-[18px] w-[18px] text-(--icon)" /> Lights</span>
-        {sw(lamps)}
-      </button>
       <div className="mx-3 my-2 border-t border-edge" />
       <div className="px-3 pb-1 text-xs text-dim">
         <p className="mb-2 flex items-center gap-2 font-semibold uppercase tracking-[.14em]"><Icon name="keyboard" className="h-4 w-4" /> Shortcuts</p>
@@ -824,6 +880,8 @@ function Menu({ focus, canFocus, spin, lamps, light, onFocus, onSpin, onLamps, o
           <Kbd>← →</Kbd><li>Change car</li>
           <Kbd>Enter</Kbd><li>Select car</li>
           {canFocus && <><Kbd>F</Kbd><li>Focus view</li></>}
+          <Kbd>+ / −</Kbd><li>Zoom in / out</li>
+          <Kbd>0</Kbd><li>Fit the car</li>
           <Kbd>Esc</Kbd><li>Close / exit focus</li>
         </ul>
       </div>

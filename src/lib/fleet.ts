@@ -1,37 +1,19 @@
 /* Fleet data and the side-profile geometry shared by the 3D models and the 2D thumbnails. */
 
-export type ClassKey = "bluebird" | "prime" | "silverbird" | "goldenbird" | "bigbird" | "cititrans" | "heritage";
+export type ClassKey = "bluebird" | "silverbird" | "goldenbird" | "bigbird" | "cititrans" | "heritage";
 export type FilterKey = "all" | ClassKey;
 export type StatKey = "cap" | "comfort" | "eco" | "agile";
 
-/** `pill` is a shorter label for the filter pills, where room is tight. */
-export const CLASSES: Record<ClassKey, { name: string; role: string; accent: string; best: string; pill?: string }> = {
-  bluebird: { name: "Bluebird", role: "Regular taxi", accent: "#5db4ff", best: "Everyday taxi rides around town." },
-  prime: { name: "Bluebird Prime", pill: "Prime", role: "Premium taxi", accent: "#22c1ee", best: "Extra room and comfort for business trips, a step up from a regular taxi." },
-  silverbird: { name: "Silverbird", role: "Executive taxi", accent: "#d5dde8", best: "Executive taxi rides with extra comfort." },
-  goldenbird: { name: "Goldenbird", role: "Car rental", accent: "#e2bb63", best: "Car rental for a day or longer." },
-  bigbird: { name: "Bigbird", role: "Charter", accent: "#43d3c4", best: "Group trips, tours and charter work." },
-  cititrans: { name: "Cititrans", role: "Intercity shuttle", accent: "#ff8a5c", best: "Shuttle runs between cities." },
-  heritage: { name: "Heritage", role: "Retired", accent: "#f0dfb8", best: "Retired from service, kept for the story." },
+export const CLASSES: Record<ClassKey, { name: string; role: string; accent: string }> = {
+  bluebird: { name: "Bluebird", role: "Regular taxi", accent: "#5db4ff" },
+  silverbird: { name: "Silverbird", role: "Executive taxi", accent: "#d5dde8" },
+  goldenbird: { name: "Goldenbird", role: "Car rental", accent: "#e2bb63" },
+  bigbird: { name: "Bigbird", role: "Charter", accent: "#43d3c4" },
+  cititrans: { name: "Cititrans", role: "Intercity shuttle", accent: "#ff8a5c" },
+  heritage: { name: "Heritage", role: "Retired", accent: "#f0dfb8" },
 };
 
-export type TraitIcon = "leaf" | "users" | "sofa" | "city" | "clock" | "bolt";
-
-/** Three headline traits, ranked from the car's ratings and power type. */
-export function traits(car: Car): { label: string; icon: TraitIcon }[] {
-  const electric = car.power === "Battery electric";
-  const pool: { label: string; icon: TraitIcon; score: number }[] = [
-    { label: "Spacious", icon: "users", score: car.r.cap },
-    { label: "Comfortable", icon: "sofa", score: car.r.comfort },
-    { label: "Nimble", icon: "city", score: car.r.agile },
-    electric
-      ? { label: "Electric", icon: "bolt", score: 10.5 }
-      : { label: "Efficient", icon: "leaf", score: car.r.eco },
-  ];
-  if (car.cls === "heritage") pool.push({ label: "Classic", icon: "clock", score: 11 });
-  return pool.sort((a, b) => b.score - a.score).slice(0, 3);
-}
-export const ORDER: FilterKey[] = ["all", "bluebird", "prime", "silverbird", "goldenbird", "bigbird", "cititrans", "heritage"];
+export const ORDER: FilterKey[] = ["all", "bluebird", "silverbird", "goldenbird", "bigbird", "cititrans", "heritage"];
 export const STATS: [StatKey, string][] = [
   ["cap", "Seats"],
   ["comfort", "Comfort"],
@@ -61,6 +43,12 @@ export interface Car {
   power: string; note: string; r: Record<StatKey, number>; p: Params; prof: Profile;
   /** Scanned 3D model to show instead of the extruded profile sketch. */
   glb?: string;
+  /** Turn (radians, about the vertical) that points the scan's nose to +x. Default π, for a nose at -x
+      (Meshy exports); π/2 for a nose at +z (Tripo exports). */
+  glbYaw?: number;
+  /** Roof height and half body width in the scan's own units, for scans the loader can't measure itself
+      (e.g. doors modelled open, which would read as roof and body). */
+  glbFit?: { roof: number; halfWidth: number };
 }
 
 const BLUE = "#2a86d6";
@@ -89,50 +77,63 @@ const RAW: RawCar[] = [
     p: { L: 4.49, W: 1.78, H: 1.69, wb: 2.7, fo: 0.9, wr: 0.35, gc: 0.24, hoodH: 1.03, cowlX: 1.1, cowlH: 1.11, roofX0: 1.86, roofX1: 4.1, rearX: 4.38, rearH: 1.13, tailH: 1.1, tumble: 0.91, rails: 1, clad: 1 } },
   { id: "e6", cls: "bluebird", maker: "BYD", model: "e6", short: "BYD e6", paint: BLUE, plate: "yellow", sign: "blue",
     blurb: "Indonesia's first electric taxi. 25 of them started carrying passengers on 1 May 2019, and a second-generation e6 followed in 2024.",
-    body: "Electric MPV", seats: "5", power: "Battery electric", note: "On the road since 2019",
+    body: "Electric MPV", seats: "5", power: "Electric", note: "On the road since 2019",
     r: { cap: 4, comfort: 6, eco: 10, agile: 7 },
     p: { L: 4.7, W: 1.81, H: 1.67, wb: 2.8, fo: 0.93, wr: 0.34, hoodH: 0.93, noseX: 0.06, cowlX: 1.02, cowlH: 1.04, roofX0: 1.92, roofX1: 4.15, drop: 0.09, rearX: 4.58, rearH: 1.1, tailH: 1.06, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
   { id: "m6", cls: "bluebird", maker: "BYD", model: "M6", short: "BYD M6", paint: BLUE, plate: "yellow", sign: "blue",
     blurb: "A three-row electric MPV. Bluebird named it in its fleet line-up for the group's 53rd anniversary.",
-    body: "Electric MPV", seats: "6 or 7", power: "Battery electric", note: "Named in the 2025 fleet line-up",
+    body: "Electric MPV", seats: "6 or 7", power: "Electric", note: "Named in the 2025 fleet line-up",
     r: { cap: 6, comfort: 7, eco: 10, agile: 6 },
     p: { L: 4.71, W: 1.81, H: 1.69, wb: 2.8, fo: 0.93, wr: 0.34, hoodH: 0.96, noseX: 0.05, cowlX: 0.98, cowlH: 1.06, roofX0: 1.8, roofX1: 4.32, drop: 0.06, rearX: 4.61, rearH: 1.1, tailH: 1.07, tumble: 0.92, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
-  { id: "e6-prime", cls: "prime", maker: "BYD", model: "e6", short: "e6 Prime", paint: "#1fa6dc", plate: "yellow", sign: "blue",
+  { id: "e6-prime", cls: "bluebird", maker: "BYD", model: "e6 Prime", short: "e6 Prime", paint: "#1fa6dc", plate: "yellow", sign: "blue",
     blurb: "The second-generation e6 in Bluebird Prime livery. Prime launched in July 2026 as a tier between regular taxis and Silverbird, and runs the e6 in Jakarta, Bandung, Surabaya, Medan and Bali.",
-    body: "Electric MPV", seats: "5", power: "Battery electric", note: "Bluebird Prime, July 2026",
+    body: "Electric MPV", seats: "5", power: "Electric", note: "Bluebird Prime, July 2026",
     r: { cap: 5, comfort: 8, eco: 10, agile: 7 },
-    glb: "/models/byd-e6-prime.glb",
-    // Matches the scanned model once it's scaled (see glbCar.ts); used for framing and the 2D fallback.
-    p: { L: 4.6, W: 1.81, H: 1.7, wb: 2.68, fo: 0.92, wr: 0.36, hoodH: 0.95, noseX: 0.06, cowlX: 1.15, cowlH: 1.12, roofX0: 2.05, roofX1: 4.15, drop: 0.08, rearX: 4.5, rearH: 1.2, tailH: 1.15, tumble: 0.9, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
+    glb: "/models/bluebird/byd-e6-prime.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real e6 (1.81 × 1.67 m) and the chunkier scan.
+    p: { L: 4.695, W: 1.86, H: 1.75, wb: 2.68, fo: 0.92, wr: 0.36, hoodH: 0.95, noseX: 0.06, cowlX: 1.15, cowlH: 1.12, roofX0: 2.05, roofX1: 4.15, drop: 0.08, rearX: 4.5, rearH: 1.2, tailH: 1.15, tumble: 0.9, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
   { id: "alphard", cls: "silverbird", maker: "Toyota", model: "Alphard", short: "Alphard", paint: "#0b0c10", plate: "yellow", sign: "silver",
     blurb: "The executive taxi, in black. Silverbird has run since 1993 and was the first executive taxi service in Indonesia.",
     body: "Luxury MPV", seats: "7", power: "Petrol", note: "Named in the 2025 fleet line-up",
     r: { cap: 6, comfort: 10, eco: 4, agile: 5 },
+    glb: "/models/silverbird/toyota-alphard.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
     p: { L: 5.01, W: 1.85, H: 1.95, wb: 3.0, fo: 0.93, wr: 0.36, gc: 0.19, hoodH: 1.12, cowlX: 0.92, cowlH: 1.2, roofX0: 1.62, roofX1: 4.78, drop: 0.04, rearX: 4.93, rearH: 1.22, tailH: 1.19, tumble: 0.95, gr: [0.5, 1.1], hl: [0.09, 0.4], hlDrop: 0.1 } },
   { id: "modelx", cls: "silverbird", maker: "Tesla", model: "Model X", short: "Model X", paint: "#0b0c10", plate: "yellow", sign: "silver",
     blurb: "Five Model X 75Ds opened the electric Silverbird service in 2019, launched on the same day as the BYD e6.",
-    body: "Electric SUV", seats: "Up to 7", power: "Battery electric", note: "Launched 2019 with 5 cars",
+    body: "Electric SUV", seats: "Up to 7", power: "Electric", note: "Launched 2019 with 5 cars",
     r: { cap: 6, comfort: 9, eco: 10, agile: 5 },
-    p: { L: 5.04, W: 2.0, H: 1.68, wb: 2.97, fo: 0.96, wr: 0.37, hoodH: 0.86, noseX: 0.1, noseR: 0.2, cowlX: 1.08, cowlH: 1.02, roofX0: 2.1, roofX1: 3.55, drop: 0.13, rearX: 4.82, rearH: 1.12, tailH: 1.06, tumble: 0.88, tail: "bar", gr: 0, hl: [0.07, 0.4], hlDrop: 0.12 } },
+    glb: "/models/silverbird/tesla-model-x.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // The scan has its falcon-wing doors open, so give the loader the roof and body under them.
+    glbFit: { roof: 36.6, halfWidth: 20.7 },
+    // Real length; width and height sit between the real car (2.0 × 1.68 m) and the chunkier scan.
+    p: { L: 5.04, W: 2.04, H: 1.76, wb: 2.97, fo: 0.96, wr: 0.37, hoodH: 0.86, noseX: 0.1, noseR: 0.2, cowlX: 1.08, cowlH: 1.02, roofX0: 2.1, roofX1: 3.55, drop: 0.13, rearX: 4.82, rearH: 1.12, tailH: 1.06, tumble: 0.88, tail: "bar", gr: 0, hl: [0.07, 0.4], hlDrop: 0.12 } },
   { id: "d9", cls: "goldenbird", maker: "Denza", model: "D9", short: "Denza D9", paint: "#0d0e12", plate: "white",
     blurb: "BYD's premium electric MPV. Bluebird announced it in March 2025 as a new Goldenbird car.",
-    body: "Electric luxury MPV", seats: "7", power: "Battery electric", note: "Announced March 2025",
+    body: "Electric luxury MPV", seats: "7", power: "Electric", note: "Announced March 2025",
     r: { cap: 6, comfort: 10, eco: 10, agile: 4 },
+    glb: "/models/goldenbird/denza-d9.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
     p: { L: 5.25, W: 1.96, H: 1.92, wb: 3.11, fo: 0.98, wr: 0.37, hoodH: 1.1, cowlX: 0.98, cowlH: 1.18, roofX0: 1.72, roofX1: 5.0, rearX: 5.17, rearH: 1.21, tailH: 1.18, tumble: 0.95, tail: "bar", gr: [0.42, 1.2], hl: [0.07, 0.44], hlDrop: 0.1 } },
   { id: "ioniq5", cls: "goldenbird", maker: "Hyundai", model: "Ioniq 5", short: "Ioniq 5", paint: "#9aa4ae", plate: "white",
     blurb: "Hyundai's electric crossover, offered through the Goldenbird rental service.",
-    body: "Electric crossover", seats: "5", power: "Battery electric", note: "Reported in the fleet, 2023",
+    body: "Electric crossover", seats: "5", power: "Electric", note: "Reported in the fleet, 2023",
     r: { cap: 4, comfort: 8, eco: 10, agile: 7 },
     p: { L: 4.64, W: 1.89, H: 1.6, wb: 3.0, fo: 0.85, wr: 0.37, hoodH: 0.92, noseX: 0.05, cowlX: 1.08, cowlH: 1.0, roofX0: 1.92, roofX1: 3.9, drop: 0.09, rearX: 4.48, rearH: 1.08, tailH: 1.04, tail: "bar", gr: 0, hl: [0.07, 0.5], panes: 2 } },
   { id: "ix", cls: "goldenbird", maker: "BMW", model: "iX", short: "BMW iX", paint: "#3a3f47", plate: "white",
     blurb: "Joined the electric Goldenbird range in 2023 through a tie-up with BMW Indonesia.",
-    body: "Electric SUV", seats: "5", power: "Battery electric", note: "Joined in 2023",
+    body: "Electric SUV", seats: "5", power: "Electric", note: "Joined in 2023",
     r: { cap: 4, comfort: 9, eco: 10, agile: 5 },
     p: { L: 4.95, W: 1.97, H: 1.7, wb: 3.0, fo: 0.9, wr: 0.39, gc: 0.21, hoodH: 1.04, noseX: 0.05, cowlX: 1.16, cowlH: 1.12, roofX0: 2.02, roofX1: 4.15, drop: 0.1, rearX: 4.8, rearH: 1.16, tailH: 1.1, tail: "bar", gr: [0.36, 0.5], hl: [0.06, 0.4], hlDrop: 0.12, clad: 1 } },
   { id: "hiace", cls: "bigbird", maker: "Toyota", model: "Hiace Commuter", short: "Hiace Commuter", paint: "#e4e9ee", plate: "yellow",
     blurb: "The group's people-mover van, listed for both Goldenbird rental and Bigbird charter work.",
     body: "Passenger van", seats: "Up to 16", power: "Diesel", note: "Named in the 2025 fleet line-up",
     r: { cap: 8, comfort: 5, eco: 3, agile: 4 },
+    glb: "/models/bigbird/toyota-hiace.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // The scan is the cab-over H200 Commuter, and its proportions match the real van, so it takes the real size.
     p: { L: 5.38, W: 1.88, H: 2.28, wb: 3.11, fo: 0.98, wr: 0.34, hoodH: 1.02, cowlX: 0.34, cowlH: 1.14, roofX0: 1.05, roofX1: 5.24, drop: 0, rearX: 5.31, rearH: 1.2, tailH: 1.17, tumble: 0.97, panes: 4, gr: [0.14, 0.9], hl: [0.14, 0.36], hlDrop: 0.14 } },
   { id: "coach", cls: "bigbird", maker: "Bigbird", model: "Charter Coach", short: "Charter Coach", paint: "#3f97dd", plate: "yellow",
     blurb: "A full-size charter bus. Bigbird was set up in December 1978 and started running the following year.",
@@ -154,6 +155,15 @@ const RAW: RawCar[] = [
     body: "Sedan", seats: "5", power: "Petrol", note: "Wore the pre-2018 livery",
     r: { cap: 4, comfort: 5, eco: 5, agile: 8 },
     p: { L: 4.41, W: 1.7, H: 1.47, wb: 2.55, fo: 0.9, wr: 0.31, hoodH: 0.84, noseX: 0.05, cowlX: 1.15, cowlH: 0.94, roofX0: 1.92, roofX1: 3.15, drop: 0.04, rearX: 3.85, rearH: 1.0, tailH: 0.97, tumble: 0.88, panes: 2, tail: "h", gr: [0.1, 0.8] } },
+  { id: "bmw-2002", cls: "heritage", maker: "BMW", model: "2002", short: "BMW 2002", paint: "#3f7fcf", plate: "yellow", sign: "silver",
+    blurb: "A blue BMW 2002 with a white roof, dressed as a classic taxi. It isn't part of Bluebird's recorded fleet; it's here as a showroom piece from the same era as the first Toranas.",
+    body: "Sedan", seats: "5", power: "Petrol", note: "Showroom piece, 1970s classic",
+    r: { cap: 4, comfort: 4, eco: 2, agile: 8 },
+    glb: "/models/heritage/bmw-2002.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real car (1.59 × 1.41 m) and the chunkier scan,
+    // so the scan isn't squashed enough to turn its wheels oval.
+    p: { L: 4.23, W: 1.7, H: 1.5, wb: 2.5, fo: 0.73, wr: 0.3, gc: 0.16, hoodH: 0.82, noseR: 0.06, cowlX: 1.3, cowlH: 0.9, roofX0: 1.75, roofX1: 2.85, drop: 0.02, rearX: 3.3, rearH: 0.88, tailH: 0.84, tailR: 0.06, tumble: 0.86, panes: 2, tail: "h", gr: [0.14, 0.5], hl: "round", chrome: 1 } },
 ];
 
 /* ---------- geometry ---------- */

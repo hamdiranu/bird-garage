@@ -34,7 +34,6 @@ export async function renderThumbs(cars: Car[], w = 260, h = 130): Promise<Recor
     }
     obj.position.set(0, 0, 0);
     obj.rotation.set(0, 0, 0);
-    obj.traverse((n) => { if (n instanceof THREE.Sprite) n.visible = false; });
     scene.add(obj);
     box.setFromObject(obj).getBoundingSphere(sphere);
     const corners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new THREE.Vector3(
