@@ -25,11 +25,11 @@ Built with **Next.js 16**, **React 19**, **React Three Fiber**, **Drei**, **Thre
 ## Features
 
 - **3D showroom.** Each vehicle stands on the glowing platform of a showroom photo, with a soft floor reflection and lighting matched to the photo. Drag to spin it, use the Front, Side and Rear camera presets, or zoom in from 75% to 250% (wheel, pinch, buttons or keys).
-- **17 vehicles in 6 services:** Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and Heritage. Each service has its own badge and accent colour.
-- **Scanned model support.** The Bluebird BYD e6 (in its real Prime livery), the Silverbird Toyota Alphard and Tesla Model X (falcon-wing doors open), the Goldenbird Denza D9, the Bigbird Toyota Hiace Commuter, and a vintage BMW 2002 taxi are textured 3D scans, compressed for the web (1.2–1.4 MB each). Untextured scans can be used too; they get the livery painted on by a shader.
+- **16 vehicles in 6 services:** Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and Heritage. Each service has its own badge and accent colour.
+- **Scanned model support.** 14 of the 16 are textured 3D scans in their real liveries, compressed for the web (1.1–1.4 MB each); the Model X has its falcon-wing doors open. The Holden Torana and Toyota Limo are still sketched from their side profiles. Untextured scans can be used too; they get the livery painted on by a shader.
 - **Light and dark mode.** A daytime and a night-time showroom. The whole interface, the photo and the car's lighting cross-fade together in 0.7 s.
 - **Focus view.** The side cards slide away, the car fills the stage, and its title moves to the top.
-- **Info cards.** On the left: the service, maker and model, a description, a spec grid (body, seats, power, length) and the service badge with the car's fleet note. On the right: ratings out of 10 with an animated overall score and star row.
+- **Info cards.** On the left: the service, maker and model, a description, a spec grid (body, seats, power, length) and the maker's emblem with the car's fleet note. On the right: ratings out of 10 with an animated overall score and star row.
 - **Roster strip.** 3D-rendered thumbnails of every vehicle, filtered by service.
 - **Remembers your choices.** Your picked car, last-viewed car, spin and theme are saved. `/#<car-id>` links straight to a car.
 - **Responsive.** Three columns on desktop. On tablets and phones the description stays beside the car and the ratings move below.
@@ -108,12 +108,13 @@ public/
   showroom.jpg            night showroom (dark theme backdrop)
   showroom-day.jpg        day showroom (light theme backdrop), framed identically
   icons/*.png             service badges, trimmed to 128×128
+  logos/                  car maker emblems (SVG, or WebP for Hino), with dark-theme versions where needed and Cardog's MIT licence
   models/<service>/*.glb  textured scans, one folder per service (Meshopt + WebP, see "Add a scanned car"):
-    bluebird/             BYD e6 Prime
+    bluebird/             Toyota Transmover, Honda Mobilio, Honda BR-V, BYD M6, BYD e6 Prime
     silverbird/           Toyota Alphard, Tesla Model X
-    goldenbird/           Denza D9
-    bigbird/              Toyota Hiace
-    cititrans/            (empty for now)
+    goldenbird/           Denza D9, BMW iX, Hyundai Ioniq 5
+    bigbird/              Toyota Hiace, Charter Coach
+    cititrans/            Hino RM280 Jetbus 5
     heritage/             BMW 2002
 src/
   app/
@@ -231,15 +232,20 @@ Main profile values:
 
 The easiest start is to copy a similar car and adjust. The roster, filters, counter and thumbnails pick it up automatically.
 
+**Maker logo.** The info card's footer shows the maker's emblem straight on the card, from `MAKER_LOGO` in `fleet.ts`, keyed by `maker`. A maker that isn't listed gets its initial instead.
+- **Getting one.** [Cardog Icons](https://www.npmjs.com/package/@cardog-icons/core) (MIT, about 50 brands) has most car makers: copy `optimized/<Brand> Icon.svg` from the `@cardog-icons/core` package to `public/logos/<brand>.svg`. Copy the SVG rather than importing `@cardog-icons/react`: that package ships every logo in one file that bundlers can't trim, so even one icon adds about 1 MB (gzipped) to the page.
+- **Crop it.** Trim the file's `viewBox` to the emblem itself, so every logo fills the footer slot the same way. A logo that's really a bitmap inside an SVG (as the Hino one was) is better saved as a trimmed WebP about 192 px across.
+- **Check it on the dark card.** Black or navy parts disappear there. Add a `dark` version with those parts turned white (`bmw-dark.svg`, `hyundai-dark.svg` and `hino-dark.webp` are examples); it replaces the colour one in the dark theme.
+
 ### Add a scanned (GLB) car
 
-1. **Shrink it for the web.** Generated scans are large: the Tripo exports here are 17–27 MB, mostly 4K textures (one is a 10–19 MB PNG). [glTF-Transform](https://gltf-transform.dev/) compresses geometry with Meshopt and converts textures to 2048px WebP:
+1. **Shrink it for the web.** Generated scans are large: the Tripo exports here are 15–27 MB, mostly 4K textures (one is a 10–19 MB PNG). [glTF-Transform](https://gltf-transform.dev/) compresses geometry with Meshopt and converts textures to 2048px WebP:
 
    ```bash
    npx @gltf-transform/cli optimize input.glb public/models/<service>/your-car.glb --compress meshopt --texture-compress webp --texture-size 2048 --simplify false
    ```
 
-   Tripo exports have about 100k triangles, so they don't need simplifying; each came out at 1.2–1.4 MB. For a much denser mesh (Meshy exports reached 0.7–1.8 million triangles), replace `--simplify false` with `--simplify-ratio 0.1 --simplify-error 0.001` to keep about a tenth of the vertices. Keep your original; the optimised copy is lossy.
+   Tripo exports have about 100k triangles, so they don't need simplifying; each came out at 1.1–1.4 MB. For a much denser mesh (Meshy exports reached 0.7–1.8 million triangles), replace `--simplify false` with `--simplify-ratio 0.1 --simplify-error 0.001` to keep about a tenth of the vertices. Keep your original; the optimised copy is lossy.
 2. **Check the orientation.** The loader uses the first mesh it finds and expects **y up**. Set `glbYaw` on the car to the turn that points its nose to +x:
    - Meshy exports put the nose at −x. That's the default (`Math.PI`), so leave `glbYaw` out.
    - Tripo exports put it at +z. Use `glbYaw: Math.PI / 2`, as on the Alphard.
@@ -300,5 +306,6 @@ Recent Chrome, Edge, Safari and Firefox.
 ## Credits
 
 - Fleet facts (models, launch dates, service history) are from public Bluebird Group announcements and press coverage.
-- The showroom photos, service badges and Bluebird icon were supplied for this project. The textured models (BYD e6, Alphard, Model X, Denza D9, Hiace and BMW 2002) were generated with Tripo. The BMW 2002 is a showroom piece, not part of Bluebird's recorded fleet.
+- The showroom photos, service badges and Bluebird icon were supplied for this project. The 14 textured models (every car except the Torana and Toyota Limo) were generated with Tripo. The BMW 2002 is a showroom piece, not part of Bluebird's recorded fleet.
+- Car maker emblems for BMW, BYD, Honda, Hyundai, Tesla and Toyota are from [Cardog Icons](https://www.npmjs.com/package/@cardog-icons/core), MIT © 2024 Cardog; the licence is in `public/logos/LICENSE.txt`. The Denza, Hino and Holden emblems were supplied for this project. The dark-theme versions and crops were made from these. The marks themselves belong to their manufacturers and are used here only to identify each car's maker.
 - Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and related marks belong to PT Blue Bird Tbk. This is an unofficial fan project.

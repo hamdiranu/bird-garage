@@ -13,6 +13,23 @@ export const CLASSES: Record<ClassKey, { name: string; role: string; accent: str
   heritage: { name: "Heritage", role: "Retired", accent: "#f0dfb8" },
 };
 
+/** Each maker's emblem, keyed by `Car.maker`, plus a `dark` version where the colour one would vanish on the dark
+    card (black or navy parts turned white). BMW, BYD, Honda, Hyundai, Tesla and Toyota are from Cardog Icons; Denza,
+    Hino and Holden were supplied for this project; Bigbird is the group's own badge. A maker missing here shows its
+    initial instead. */
+export const MAKER_LOGO: Partial<Record<string, { src: string; dark?: string }>> = {
+  BMW: { src: "/logos/bmw.svg", dark: "/logos/bmw-dark.svg" },
+  BYD: { src: "/logos/byd.svg" },
+  Denza: { src: "/logos/denza.svg" },
+  "Hino RM280": { src: "/logos/hino.webp", dark: "/logos/hino-dark.webp" },
+  Holden: { src: "/logos/holden.svg" },
+  Honda: { src: "/logos/honda.svg" },
+  Hyundai: { src: "/logos/hyundai.svg", dark: "/logos/hyundai-dark.svg" },
+  Tesla: { src: "/logos/tesla.svg" },
+  Toyota: { src: "/logos/toyota.svg" },
+  Bigbird: { src: "/icons/bigbird.png" },
+};
+
 export const ORDER: FilterKey[] = ["all", "bluebird", "silverbird", "goldenbird", "bigbird", "cititrans", "heritage"];
 export const STATS: [StatKey, string][] = [
   ["cap", "Seats"],
@@ -64,27 +81,36 @@ const RAW: RawCar[] = [
     blurb: "Toyota's taxi-only MPV, built on the Avanza. It comes first whenever Bluebird lists its regular fleet.",
     body: "Compact MPV", seats: "7", power: "Petrol", note: "Named in the 2025 fleet line-up",
     r: { cap: 6, comfort: 5, eco: 5, agile: 8 },
-    p: { L: 4.4, W: 1.73, H: 1.7, wb: 2.75, fo: 0.83, wr: 0.32, hoodH: 0.97, cowlX: 1.0, cowlH: 1.06, roofX0: 1.72, roofX1: 4.02, rearX: 4.3, rearH: 1.08, tailH: 1.05, tumble: 0.92 } },
+    glb: "/models/bluebird/toyota-transmover.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real car (1.73 × 1.7 m) and the chunkier scan.
+    p: { L: 4.4, W: 1.77, H: 1.71, wb: 2.75, fo: 0.83, wr: 0.32, hoodH: 0.97, cowlX: 1.0, cowlH: 1.06, roofX0: 1.72, roofX1: 4.02, rearX: 4.3, rearH: 1.08, tailH: 1.05, tumble: 0.92 } },
   { id: "mobilio", cls: "bluebird", maker: "Honda", model: "Mobilio", short: "Mobilio", paint: BLUE, plate: "yellow", sign: "blue",
     blurb: "Honda's low-roof seven-seater in Bluebird blue. It shares regular taxi duty with the Transmover.",
     body: "Compact MPV", seats: "7", power: "Petrol", note: "Named in the 2025 fleet line-up",
     r: { cap: 6, comfort: 5, eco: 6, agile: 8 },
-    p: { L: 4.39, W: 1.68, H: 1.6, wb: 2.65, fo: 0.86, wr: 0.31, hoodH: 0.9, cowlX: 0.98, cowlH: 1.0, roofX0: 1.78, roofX1: 3.98, drop: 0.07, rearX: 4.28, rearH: 1.06, tailH: 1.03, tumble: 0.91 } },
+    glb: "/models/bluebird/honda-mobilio.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // The scan's roof sign is wide enough to pass for roof, so give the loader the roof and body under it.
+    glbFit: { roof: 39.3, halfWidth: 20.8 },
+    // Real length; width and height sit between the real car (1.68 × 1.6 m) and the chunkier scan.
+    p: { L: 4.39, W: 1.77, H: 1.68, wb: 2.65, fo: 0.86, wr: 0.31, hoodH: 0.9, cowlX: 0.98, cowlH: 1.0, roofX0: 1.78, roofX1: 3.98, drop: 0.07, rearX: 4.28, rearH: 1.06, tailH: 1.03, tumble: 0.91 } },
   { id: "brv", cls: "bluebird", maker: "Honda", model: "BR-V", short: "BR-V", paint: BLUE, plate: "yellow", sign: "blue",
     blurb: "Honda's seven-seat crossover, with a little more ground clearance than the MPVs it works alongside.",
     body: "Crossover MPV", seats: "7", power: "Petrol", note: "Pictured in Bluebird livery",
     r: { cap: 6, comfort: 6, eco: 5, agile: 7 },
-    p: { L: 4.49, W: 1.78, H: 1.69, wb: 2.7, fo: 0.9, wr: 0.35, gc: 0.24, hoodH: 1.03, cowlX: 1.1, cowlH: 1.11, roofX0: 1.86, roofX1: 4.1, rearX: 4.38, rearH: 1.13, tailH: 1.1, tumble: 0.91, rails: 1, clad: 1 } },
-  { id: "e6", cls: "bluebird", maker: "BYD", model: "e6", short: "BYD e6", paint: BLUE, plate: "yellow", sign: "blue",
-    blurb: "Indonesia's first electric taxi. 25 of them started carrying passengers on 1 May 2019, and a second-generation e6 followed in 2024.",
-    body: "Electric MPV", seats: "5", power: "Electric", note: "On the road since 2019",
-    r: { cap: 4, comfort: 6, eco: 10, agile: 7 },
-    p: { L: 4.7, W: 1.81, H: 1.67, wb: 2.8, fo: 0.93, wr: 0.34, hoodH: 0.93, noseX: 0.06, cowlX: 1.02, cowlH: 1.04, roofX0: 1.92, roofX1: 4.15, drop: 0.09, rearX: 4.58, rearH: 1.1, tailH: 1.06, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
+    glb: "/models/bluebird/honda-brv.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real car (1.78 × 1.69 m) and the chunkier scan.
+    p: { L: 4.49, W: 1.83, H: 1.72, wb: 2.7, fo: 0.9, wr: 0.35, gc: 0.24, hoodH: 1.03, cowlX: 1.1, cowlH: 1.11, roofX0: 1.86, roofX1: 4.1, rearX: 4.38, rearH: 1.13, tailH: 1.1, tumble: 0.91, rails: 1, clad: 1 } },
   { id: "m6", cls: "bluebird", maker: "BYD", model: "M6", short: "BYD M6", paint: BLUE, plate: "yellow", sign: "blue",
     blurb: "A three-row electric MPV. Bluebird named it in its fleet line-up for the group's 53rd anniversary.",
     body: "Electric MPV", seats: "6 or 7", power: "Electric", note: "Named in the 2025 fleet line-up",
     r: { cap: 6, comfort: 7, eco: 10, agile: 6 },
-    p: { L: 4.71, W: 1.81, H: 1.69, wb: 2.8, fo: 0.93, wr: 0.34, hoodH: 0.96, noseX: 0.05, cowlX: 0.98, cowlH: 1.06, roofX0: 1.8, roofX1: 4.32, drop: 0.06, rearX: 4.61, rearH: 1.1, tailH: 1.07, tumble: 0.92, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
+    glb: "/models/bluebird/byd-m6.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real car (1.81 × 1.69 m) and the chunkier scan.
+    p: { L: 4.71, W: 1.86, H: 1.75, wb: 2.8, fo: 0.93, wr: 0.34, hoodH: 0.96, noseX: 0.05, cowlX: 0.98, cowlH: 1.06, roofX0: 1.8, roofX1: 4.32, drop: 0.06, rearX: 4.61, rearH: 1.1, tailH: 1.07, tumble: 0.92, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
   { id: "e6-prime", cls: "bluebird", maker: "BYD", model: "e6 Prime", short: "e6 Prime", paint: "#1fa6dc", plate: "yellow", sign: "blue",
     blurb: "The second-generation e6 in Bluebird Prime livery. Prime launched in July 2026 as a tier between regular taxis and Silverbird, and runs the e6 in Jakarta, Bandung, Surabaya, Medan and Bali.",
     body: "Electric MPV", seats: "5", power: "Electric", note: "Bluebird Prime, July 2026",
@@ -117,16 +143,22 @@ const RAW: RawCar[] = [
     glb: "/models/goldenbird/denza-d9.glb",
     glbYaw: Math.PI / 2, // Tripo export: nose at +z
     p: { L: 5.25, W: 1.96, H: 1.92, wb: 3.11, fo: 0.98, wr: 0.37, hoodH: 1.1, cowlX: 0.98, cowlH: 1.18, roofX0: 1.72, roofX1: 5.0, rearX: 5.17, rearH: 1.21, tailH: 1.18, tumble: 0.95, tail: "bar", gr: [0.42, 1.2], hl: [0.07, 0.44], hlDrop: 0.1 } },
-  { id: "ioniq5", cls: "goldenbird", maker: "Hyundai", model: "Ioniq 5", short: "Ioniq 5", paint: "#9aa4ae", plate: "white",
+  { id: "ioniq5", cls: "goldenbird", maker: "Hyundai", model: "Ioniq 5", short: "Ioniq 5", paint: "#0b0c10", plate: "white",
     blurb: "Hyundai's electric crossover, offered through the Goldenbird rental service.",
     body: "Electric crossover", seats: "5", power: "Electric", note: "Reported in the fleet, 2023",
     r: { cap: 4, comfort: 8, eco: 10, agile: 7 },
-    p: { L: 4.64, W: 1.89, H: 1.6, wb: 3.0, fo: 0.85, wr: 0.37, hoodH: 0.92, noseX: 0.05, cowlX: 1.08, cowlH: 1.0, roofX0: 1.92, roofX1: 3.9, drop: 0.09, rearX: 4.48, rearH: 1.08, tailH: 1.04, tail: "bar", gr: 0, hl: [0.07, 0.5], panes: 2 } },
-  { id: "ix", cls: "goldenbird", maker: "BMW", model: "iX", short: "BMW iX", paint: "#3a3f47", plate: "white",
+    glb: "/models/goldenbird/hyundai-ioniq5.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real car (1.89 × 1.6 m) and the chunkier scan.
+    p: { L: 4.64, W: 1.98, H: 1.66, wb: 3.0, fo: 0.85, wr: 0.37, hoodH: 0.92, noseX: 0.05, cowlX: 1.08, cowlH: 1.0, roofX0: 1.92, roofX1: 3.9, drop: 0.09, rearX: 4.48, rearH: 1.08, tailH: 1.04, tail: "bar", gr: 0, hl: [0.07, 0.5], panes: 2 } },
+  { id: "ix", cls: "goldenbird", maker: "BMW", model: "iX", short: "BMW iX", paint: "#0b0c10", plate: "white",
     blurb: "Joined the electric Goldenbird range in 2023 through a tie-up with BMW Indonesia.",
     body: "Electric SUV", seats: "5", power: "Electric", note: "Joined in 2023",
     r: { cap: 4, comfort: 9, eco: 10, agile: 5 },
-    p: { L: 4.95, W: 1.97, H: 1.7, wb: 3.0, fo: 0.9, wr: 0.39, gc: 0.21, hoodH: 1.04, noseX: 0.05, cowlX: 1.16, cowlH: 1.12, roofX0: 2.02, roofX1: 4.15, drop: 0.1, rearX: 4.8, rearH: 1.16, tailH: 1.1, tail: "bar", gr: [0.36, 0.5], hl: [0.06, 0.4], hlDrop: 0.12, clad: 1 } },
+    glb: "/models/goldenbird/bmw-ix.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real car (1.97 × 1.7 m) and the chunkier scan.
+    p: { L: 4.95, W: 2.02, H: 1.75, wb: 3.0, fo: 0.9, wr: 0.39, gc: 0.21, hoodH: 1.04, noseX: 0.05, cowlX: 1.16, cowlH: 1.12, roofX0: 2.02, roofX1: 4.15, drop: 0.1, rearX: 4.8, rearH: 1.16, tailH: 1.1, tail: "bar", gr: [0.36, 0.5], hl: [0.06, 0.4], hlDrop: 0.12, clad: 1 } },
   { id: "hiace", cls: "bigbird", maker: "Toyota", model: "Hiace Commuter", short: "Hiace Commuter", paint: "#e4e9ee", plate: "yellow",
     blurb: "The group's people-mover van, listed for both Goldenbird rental and Bigbird charter work.",
     body: "Passenger van", seats: "Up to 16", power: "Diesel", note: "Named in the 2025 fleet line-up",
@@ -139,12 +171,20 @@ const RAW: RawCar[] = [
     blurb: "A full-size charter bus. Bigbird was set up in December 1978 and started running the following year.",
     body: "Coach bus", seats: "Varies by bus", power: "Diesel", note: "Bus arm since 1979",
     r: { cap: 10, comfort: 7, eco: 3, agile: 1 },
-    p: { L: 12, W: 2.5, H: 3.5, wb: 6.0, fo: 2.65, wr: 0.5, gc: 0.34, tw: 0.3, hoodH: 1.7, noseR: 0.12, cowlX: 0.09, cowlH: 1.75, roofX0: 0.42, roofX1: 11.86, drop: 0, rearX: 11.9, rearH: 1.78, tailH: 1.74, tailR: 0.12, tumble: 0.985, panes: 7, winTop: 3.12, gr: 0, hl: [0.14, 0.5], hlDrop: 0.95, bus: 1 } },
+    glb: "/models/bigbird/charter-coach.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; height and width sit between a real high-deck coach (about 3.8 × 2.5 m) and the much chunkier
+    // scan, so its wheels stay nearly round.
+    p: { L: 12, W: 2.8, H: 4.2, wb: 6.0, fo: 2.65, wr: 0.5, gc: 0.34, tw: 0.3, hoodH: 1.7, noseR: 0.12, cowlX: 0.09, cowlH: 1.75, roofX0: 0.42, roofX1: 11.86, drop: 0, rearX: 11.9, rearH: 1.78, tailH: 1.74, tailR: 0.12, tumble: 0.985, panes: 7, winTop: 3.12, gr: 0, hl: [0.14, 0.5], hlDrop: 0.95, bus: 1 } },
   { id: "jetbus", cls: "cititrans", maker: "Hino RM280", model: "Jetbus 5", short: "Jetbus 5", paint: "#eef1f4", plate: "yellow",
     blurb: "The Cititrans Busline coach: a Hino RM280 chassis under Adiputro's Jetbus 5 body, in a 28-seat Super Executive layout.",
     body: "Executive coach", seats: "28", power: "Diesel", note: "Cititrans joined the group in 2019",
     r: { cap: 9, comfort: 9, eco: 3, agile: 1 },
-    p: { L: 12, W: 2.5, H: 3.7, wb: 5.9, fo: 2.7, wr: 0.5, gc: 0.34, tw: 0.3, hoodH: 1.75, noseX: 0.05, noseR: 0.14, cowlX: 0.12, cowlH: 1.8, roofX0: 0.7, roofX1: 11.8, drop: 0, rearX: 11.9, rearH: 1.9, tailH: 1.85, tailR: 0.14, tumble: 0.985, panes: 6, winTop: 3.3, gr: 0, hl: [0.12, 0.55], hlDrop: 0.95, bus: 1 } },
+    glb: "/models/cititrans/hino-jetbus5.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; height and width sit between the real coach (about 3.7 × 2.5 m) and the much chunkier scan,
+    // so its wheels stay nearly round.
+    p: { L: 12, W: 2.75, H: 4.1, wb: 5.9, fo: 2.7, wr: 0.5, gc: 0.34, tw: 0.3, hoodH: 1.75, noseX: 0.05, noseR: 0.14, cowlX: 0.12, cowlH: 1.8, roofX0: 0.7, roofX1: 11.8, drop: 0, rearX: 11.9, rearH: 1.9, tailH: 1.85, tailR: 0.14, tumble: 0.985, panes: 6, winTop: 3.3, gr: 0, hl: [0.12, 0.55], hlDrop: 0.95, bus: 1 } },
   { id: "torana", cls: "heritage", maker: "Holden", model: "Torana", short: "Torana", paint: "#3b78c2", plate: "yellow", sign: "blue",
     blurb: "Where it began. 25 Toranas made up the first Blue Bird fleet in 1972, and one is kept on display at head office in Jakarta.",
     body: "Sedan", seats: "5", power: "Petrol", note: "First fleet, 1972",

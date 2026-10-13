@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { CARS, CLASSES, ORDER, STATS, type FilterKey, type StatKey } from "@/lib/fleet";
+import { CARS, CLASSES, MAKER_LOGO, ORDER, STATS, type FilterKey, type StatKey } from "@/lib/fleet";
 import SideView from "./SideView";
 import Image from "next/image";
 import { Icon, StarFill, type IconName } from "./Icon";
@@ -91,6 +91,7 @@ export default function Garage() {
 
   const car = CARS[cur];
   const cl = CLASSES[car.cls];
+  const logo = MAKER_LOGO[car.maker];
   const list = CARS.map((c, i) => (filter === "all" || c.cls === filter ? i : -1)).filter((i) => i >= 0);
   const at = list.indexOf(cur);
   const picked = pick === car.id;
@@ -566,10 +567,11 @@ export default function Garage() {
             ] as const).map(([k, v, icon], i) => (
               <div
                 key={k}
-                className={`relative min-w-0 py-[clamp(9px,1.35vh,16px)] ${i ? "border-t border-edge" : ""} ${i === 1 ? "sm:border-t-0" : ""} ${i % 2 ? "sm:pl-[46px] sm:before:absolute sm:before:inset-y-3 sm:before:left-0 sm:before:w-px sm:before:bg-edge" : "sm:pl-[30px] sm:pr-3"}`}
+                className={`relative min-w-0 py-[clamp(9px,1.35vh,16px)] ${i ? "border-t border-edge" : ""} ${i === 1 ? "sm:border-t-0" : ""} ${i % 2 ? "sm:pl-4 sm:before:absolute sm:before:inset-y-3 sm:before:left-0 sm:before:w-px sm:before:bg-edge" : "sm:pr-3"}`}
               >
-                <dt className="text-[10px] font-medium uppercase leading-none tracking-[.1em] text-dim md:text-[11px] 2xl:text-xs">
-                  <Icon name={icon} className={`absolute top-[calc(clamp(9px,1.35vh,16px)+1px)] hidden h-5 w-5 text-soft sm:block ${i % 2 ? "left-4" : "left-0"}`} />
+                {/* icon and label on the first line, the value on the full width under them */}
+                <dt className="flex items-center gap-1.5 text-[10px] font-medium uppercase leading-none tracking-[.1em] text-dim md:text-[11px] 2xl:text-xs">
+                  <Icon name={icon} className="hidden h-4 w-4 flex-none text-soft sm:block 2xl:h-[18px] 2xl:w-[18px]" />
                   {k}
                 </dt>
                 <dd className="mt-1.5 text-[13px] leading-snug md:text-sm 2xl:text-[15px]">{v}</dd>
@@ -577,13 +579,31 @@ export default function Garage() {
             ))}
           </dl>
 
-          {/* service footer: badge, name and the car's place in the fleet */}
+          {/* maker footer: emblem (or the maker's initial), name, and the car's place in the fleet. The slot is a little
+              wider than tall so round and wide emblems look about the same size; the dark version swaps in by theme. */}
           <div data-anim className="flex items-center gap-3 border-t border-edge pt-(--gap)">
-            <span className="hidden h-10 w-10 flex-none place-items-center rounded-full border border-edge bg-(--icon-bg) sm:grid 2xl:h-14 2xl:w-14">
-              <Image src={`/icons/${CLASS_BADGE[car.cls]}.png`} alt="" width={32} height={32} className="h-7 w-7 object-contain 2xl:h-8 2xl:w-8" />
+            <span className="hidden h-10 w-[52px] flex-none grid-cols-1 grid-rows-1 place-items-center sm:grid 2xl:h-[52px] 2xl:w-16">
+              {logo ? (
+                <>
+                  {logo.dark && (
+                    <Image src={logo.dark} alt="" width={64} height={52} unoptimized loading="eager" className="col-start-1 row-start-1 h-full w-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,.35)] light:hidden" />
+                  )}
+                  <Image
+                    src={logo.src}
+                    alt=""
+                    width={64}
+                    height={52}
+                    unoptimized
+                    loading="eager"
+                    className={`col-start-1 row-start-1 h-full w-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,.35)] light:drop-shadow-none ${logo.dark ? "hidden light:block" : ""}`}
+                  />
+                </>
+              ) : (
+                <span className="font-display text-3xl font-bold leading-none text-soft">{car.maker[0]}</span>
+              )}
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight 2xl:text-[15px]">{cl.name}</p>
+              <p className="text-sm font-semibold leading-tight 2xl:text-[15px]">{car.maker}</p>
               <p className="mt-0.5 text-xs leading-snug text-soft 2xl:text-[13px]">{car.note}</p>
             </div>
           </div>
