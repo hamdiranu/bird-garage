@@ -77,6 +77,14 @@ const D: Partial<Params> = {
 type RawCar = Omit<Car, "p" | "prof"> & { p: Partial<Params> };
 
 const RAW: RawCar[] = [
+  { id: "e6-prime", cls: "bluebird", maker: "BYD", model: "e6 Prime", short: "e6 Prime", paint: "#1fa6dc", plate: "yellow", sign: "blue",
+    blurb: "The second-generation e6 in Bluebird Prime livery. Prime launched in July 2026 as a tier between regular taxis and Silverbird, and runs the e6 in Jakarta, Bandung, Surabaya, Medan and Bali.",
+    body: "Electric MPV", seats: "5", power: "Electric", note: "Bluebird Prime, July 2026",
+    r: { cap: 5, comfort: 8, eco: 10, agile: 7 },
+    glb: "/models/bluebird/byd-e6-prime.glb",
+    glbYaw: Math.PI / 2, // Tripo export: nose at +z
+    // Real length; width and height sit between the real e6 (1.81 × 1.67 m) and the chunkier scan.
+    p: { L: 4.695, W: 1.86, H: 1.75, wb: 2.68, fo: 0.92, wr: 0.36, hoodH: 0.95, noseX: 0.06, cowlX: 1.15, cowlH: 1.12, roofX0: 2.05, roofX1: 4.15, drop: 0.08, rearX: 4.5, rearH: 1.2, tailH: 1.15, tumble: 0.9, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
   { id: "transmover", cls: "bluebird", maker: "Toyota", model: "Transmover", short: "Transmover", paint: BLUE, plate: "yellow", sign: "blue",
     blurb: "Toyota's taxi-only MPV, built on the Avanza. It comes first whenever Bluebird lists its regular fleet.",
     body: "Compact MPV", seats: "7", power: "Petrol", note: "Named in the 2025 fleet line-up",
@@ -111,14 +119,6 @@ const RAW: RawCar[] = [
     glbYaw: Math.PI / 2, // Tripo export: nose at +z
     // Real length; width and height sit between the real car (1.81 × 1.69 m) and the chunkier scan.
     p: { L: 4.71, W: 1.86, H: 1.75, wb: 2.8, fo: 0.93, wr: 0.34, hoodH: 0.96, noseX: 0.05, cowlX: 0.98, cowlH: 1.06, roofX0: 1.8, roofX1: 4.32, drop: 0.06, rearX: 4.61, rearH: 1.1, tailH: 1.07, tumble: 0.92, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
-  { id: "e6-prime", cls: "bluebird", maker: "BYD", model: "e6 Prime", short: "e6 Prime", paint: "#1fa6dc", plate: "yellow", sign: "blue",
-    blurb: "The second-generation e6 in Bluebird Prime livery. Prime launched in July 2026 as a tier between regular taxis and Silverbird, and runs the e6 in Jakarta, Bandung, Surabaya, Medan and Bali.",
-    body: "Electric MPV", seats: "5", power: "Electric", note: "Bluebird Prime, July 2026",
-    r: { cap: 5, comfort: 8, eco: 10, agile: 7 },
-    glb: "/models/bluebird/byd-e6-prime.glb",
-    glbYaw: Math.PI / 2, // Tripo export: nose at +z
-    // Real length; width and height sit between the real e6 (1.81 × 1.67 m) and the chunkier scan.
-    p: { L: 4.695, W: 1.86, H: 1.75, wb: 2.68, fo: 0.92, wr: 0.36, hoodH: 0.95, noseX: 0.06, cowlX: 1.15, cowlH: 1.12, roofX0: 2.05, roofX1: 4.15, drop: 0.08, rearX: 4.5, rearH: 1.2, tailH: 1.15, tumble: 0.9, tail: "bar", gr: 0, hl: [0.07, 0.42] } },
   { id: "alphard", cls: "silverbird", maker: "Toyota", model: "Alphard", short: "Alphard", paint: "#0b0c10", plate: "yellow", sign: "silver",
     blurb: "The executive taxi, in black. Silverbird has run since 1993 and was the first executive taxi service in Indonesia.",
     body: "Luxury MPV", seats: "7", power: "Petrol", note: "Named in the 2025 fleet line-up",
