@@ -12,14 +12,8 @@ const NOSE = <path d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11M
 
 const PATHS = {
   car: CAR,
-  taxi: <>{CAR}<path d="M10 6.5v-2h4v2" /></>,
   front: <>{NOSE}<rect x="3.5" y="11" width="17" height="6" rx="1.5" /><circle cx="7.5" cy="14" r="1" /><circle cx="16.5" cy="14" r="1" /></>,
   rear: <>{NOSE}<rect x="3.5" y="11" width="17" height="6" rx="1.5" /><path d="M6 14h3M15 14h3M10.5 14h3" /></>,
-  bus: <><rect x="4" y="3.5" width="16" height="14" rx="2" /><path d="M4 11h16M4 7.5h16M7 17.5V20M17 17.5V20" /><circle cx="7.5" cy="14.3" r=".9" /><circle cx="16.5" cy="14.3" r=".9" /></>,
-  route: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h6.5a3.5 3.5 0 0 0 0-7h-5a3.5 3.5 0 0 1 0-7H16" /></>,
-  star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
-  crown: <path d="M3.5 8l4.5 4L12 5l4 7 4.5-4-2 10.5h-13zM5.5 20.5h13" />,
-  key: <><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2L19 4M16 7l2.5 2.5M14 9l2 2" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,

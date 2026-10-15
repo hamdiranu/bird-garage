@@ -1,3 +1,5 @@
+import type { Theme } from "./theme";
+
 /* The showroom photo behind the stage, and where its glowing platform lands on screen.
    Measurements are in the photo's own pixels. */
 export const BACKDROP = {
@@ -23,7 +25,8 @@ export function backdropAnchor(W: number, H: number) {
   return { x: ox + b.cx * s, y: oy + b.cy * s, r: b.r * s };
 }
 
-export const backdropStyle = (theme: "dark" | "light") => ({
+/** CSS for one theme's photo, filling its box like the stage expects (see backdropAnchor). */
+export const backdropStyle = (theme: Theme) => ({
   backgroundImage: `url(${BACKDROP.src[theme]})`,
   backgroundSize: "cover",
   backgroundPosition: `${BACKDROP.posX * 100}% ${BACKDROP.posY * 100}%`,

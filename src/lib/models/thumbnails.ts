@@ -1,11 +1,18 @@
-/* Renders a front three-quarter picture of every car for the roster, then frees the GL context. */
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import type { Car } from "./fleet";
-import { loadCar } from "./carModel";
+import type { Car } from "@/types/fleet";
+import { loadCar } from "./loadCar";
 
-export async function renderThumbs(cars: Car[], w = 260, h = 130): Promise<Record<string, string>> {
+/* Renders a front three-quarter picture of every car for the roster with one off-screen renderer, then frees
+   the GL context. */
+
+/** PNG data URLs keyed by car id. A car whose model fails to load is left out (the roster keeps its 2D drawing). */
+export async function renderThumbnails(cars: Car[], w = 260, h = 130): Promise<Record<string, string>> {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  // The stage compiles the same car materials with shader checks on, so this renderer skips them. That saves a
+  // few blocking GL queries per shader and quiets the rounding notes Windows' Direct3D compiler leaves on three's
+  // environment-map shaders (logged as "Program Info Log" warnings, though the shaders link and run fine).
+  renderer.debug.checkShaderErrors = false;
   renderer.setPixelRatio(1);
   renderer.setSize(w, h, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -30,7 +37,7 @@ export async function renderThumbs(cars: Car[], w = 260, h = 130): Promise<Recor
     try {
       obj = (await loadCar(car)).root.clone(true);
     } catch {
-      continue; // the roster falls back to the 2D profile for this car
+      continue;
     }
     obj.position.set(0, 0, 0);
     obj.rotation.set(0, 0, 0);

@@ -24,10 +24,10 @@ Built with **Next.js 16**, **React 19**, **React Three Fiber**, **Drei**, **Thre
 
 ## Features
 
-- **3D showroom.** Each vehicle stands on the glowing platform of a showroom photo, with a soft floor reflection and lighting matched to the photo. Drag to spin it, use the Front, Side and Rear camera presets, or zoom in from 75% to 250% (wheel, pinch, buttons or keys).
+- **3D showroom.** Each vehicle stands on the glowing platform of a showroom photo, with a soft floor reflection. Scanned cars are shown unlit, exactly as their textures. Drag to spin it, use the Front, Side and Rear camera presets, or zoom in from 75% to 250% (wheel, pinch, buttons or keys).
 - **16 vehicles in 6 services:** Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and Heritage. Each service has its own badge and accent colour.
-- **Scanned model support.** 14 of the 16 are textured 3D scans in their real liveries, compressed for the web (1.1–1.4 MB each); the Model X has its falcon-wing doors open. The Holden Torana and Toyota Limo are still sketched from their side profiles. Untextured scans can be used too; they get the livery painted on by a shader.
-- **Light and dark mode.** A daytime and a night-time showroom. The whole interface, the photo and the car's lighting cross-fade together in 0.7 s.
+- **Scanned model support.** 15 of the 16 are textured 3D scans in their real liveries, compressed for the web (1.1–1.4 MB each); the Model X has its falcon-wing doors open. Only the Toyota Limo is still sketched from its side profile. Untextured scans can be used too; they get the livery painted on by a shader.
+- **Light and dark mode.** A daytime and a night-time showroom. The whole interface and the photo cross-fade together in 0.7 s.
 - **Focus view.** The side cards slide away, the car fills the stage, and its title moves to the top.
 - **Info cards.** On the left: the service, maker and model, a description, a spec grid (body, seats, power, length) and the maker's emblem with the car's fleet note. On the right: ratings out of 10 with an animated overall score and star row.
 - **Roster strip.** 3D-rendered thumbnails of every vehicle, filtered by service.
@@ -115,27 +115,61 @@ public/
     goldenbird/           Denza D9, BMW iX, Hyundai Ioniq 5
     bigbird/              Toyota Hiace, Charter Coach
     cititrans/            Hino RM280 Jetbus 5
-    heritage/             BMW 2002
+    heritage/             Holden Torana, BMW 2002
 src/
-  app/
+  app/                    routing only
     layout.tsx            fonts, metadata, pre-paint theme script
     page.tsx              renders <Garage />
     globals.css           Tailwind setup, theme tokens, glass/brand utilities
     icon.png              favicon
   components/
-    Garage.tsx            the whole HUD: header, cards, stage overlays, toolbar, roster, menu, focus view
-    Stage.tsx             React Three Fiber scene: camera framing, lights, car, reflection, roll-in
-    SideView.tsx          2D side profile on a <canvas> (WebGL fallback)
-    Icon.tsx              inline line icons
-    InlineScript.tsx      <script> that runs before hydration without React warnings
-  lib/
-    fleet.ts              services, cars, ratings, side-profile geometry, 2D drawing
-    carModel.ts           builds the sketched 3D cars; shared materials; loadCar()
-    glbCar.ts             loads scanned cars and paints their livery in a shader
-    thumbs.ts             renders the roster thumbnails offscreen
+    garage/               the car-select page, one file per part
+      Garage.tsx          page shell: shared state, saved state, shortcuts, focus-view slide; lays out the parts
+      Header.tsx          brand, counter, theme toggle and menu, over the filter pills
+      FilterPills.tsx     service filters (scroll fade, active pill kept in view)
+      HeaderMenu.tsx      ☰ menu: display switches and shortcut list
+      ThemeToggle.tsx     sun/moon button
+      Showroom.tsx        the stage cell: photo, 3D view or 2D fallback, overlay, buttons
+      StageButtons.tsx    prev/next, focus toggle, edge tabs
+      Toolbar.tsx         camera presets, spin, zoom
+      InfoCard.tsx        left card: service, maker, model, blurb, specs, maker emblem
+      RatingsCard.tsx     right card: overall score, rating bars, select button
+      Roster.tsx          car strip along the bottom
+      view.ts             camera presets and zoom limits
+      use*.ts             page hooks: keyboard shortcuts, side-card inset, roster thumbnails
+    stage/                the 3D view (client only, loaded with next/dynamic)
+      Stage.tsx           <Canvas> and its pointer/wheel input
+      Scene.tsx           lights, camera framing and zoom, car swapping and roll-in
+      reflection.ts       the car's faded mirror image on the deck
+      lighting.ts         night and day light sets
+      useTurntableInput.ts  drag to turn, pinch and wheel to zoom
+      types.ts            Rig, Frame and StageProps, shared with the page
+    ui/                   generic pieces: Icon, SideView (2D canvas), InlineScript
+  data/                   content, no logic
+    cars.ts               the fleet in roster order, with the profile defaults
+    services.ts           services (name, role, accent, badge) and the filter order
+    makers.ts             maker emblems
+  hooks/                  reusable hooks: useMediaQuery, useElementSize, useFitText
+  lib/                    logic, no React
+    fleet.ts              CARS (entries + defaults + outline), RATINGS and lookups
+    outline.ts            side profile → body, glasshouse and window polygons
+    sideView.ts           draws the 2D side view on a canvas
+    models/               3D models
+      loadCar.ts          scan or sketch for a car
+      sketchedCar.ts      extrudes the outline into a 3D car
+      scannedCar.ts       loads, turns and scales a GLB scan
+      livery.ts           painted livery for an untextured scan
+      materials.ts, textures.ts, types.ts
+      thumbnails.ts       renders the roster thumbnails off screen
     backdrop.ts           backdrop photos and where their platform sits
     theme.ts              light/dark resolution and persistence
+    storage.ts            what the garage remembers (localStorage)
+    dom.ts, format.ts     small browser and formatting helpers
+  types/
+    fleet.ts              Car, Service, profile and scan types, documented field by field
 ```
+
+Imports use the `@/` alias for `src/`. Components are PascalCase `.tsx` files; hooks are `use*.ts`. Anything that touches three.js lives under `components/stage/` or `lib/models/`, which only load once the 3D view mounts.
 
 ---
 
@@ -143,13 +177,13 @@ src/
 
 ### Page layout
 
-`Garage.tsx` is a single client component.
+`Garage.tsx` is the client boundary. It holds the state the parts share (current car, filter, pick, zoom, theme, focus view) and passes each part what it needs; each part handles its own layout effects and animations.
 
-- **Desktop (≥ 1024 px).** The 3D stage is full-bleed behind everything, and two frosted cards float over its left and right edges. The code measures how much of the stage the cards cover, along with the top hint/title and the bottom toolbar, and passes that to the 3D scene as a `Frame`. The car is then framed in the clear area between them.
+- **Desktop (≥ 1024 px).** The 3D stage is full-bleed behind everything, and two frosted cards float over its left and right edges. `useSideCardInset` measures how much of the stage the cards cover, `Showroom` measures the top hint/title and the bottom toolbar, and together they go to the 3D scene as a `Frame`. The car is then framed in the clear area between them.
 - **Tablet and phone.** The stage becomes a grid cell beside the description card. The ratings card moves below, and on phones the toolbar gets its own row.
 - **Header.** One row from 768 px up. The filter pills compact themselves below 1536 px. If they still don't fit, they scroll sideways, with faded edges only where pills are hidden.
 
-### The 3D stage (`Stage.tsx`)
+### The 3D stage (`components/stage/`)
 
 - **Transparent canvas over a photo.** The canvas has no background; the showroom photo is a CSS background behind it. `backdrop.ts` records where the photo's platform ring is: centre `(994, 785)` and radius `592`, in the photo's 2000×1116 pixels. `backdropAnchor()` converts that to screen coordinates for whatever size the stage is.
 - **Standing on the platform.** The camera always looks at the car's ground point. `camera.setViewOffset` shifts the projection so that point lands on the ring's centre. The camera is tilted 8.7° (`el = asin(90 / 592)`, from the ring's height-to-width ratio), so the car's perspective matches the photo's. Vertical drag-tilt is locked for that reason.
@@ -158,32 +192,32 @@ src/
   - **Zooming in** magnifies the image around the middle of the car. The camera renders a smaller window of its view (`setViewOffset`), and the photo layer is CSS-scaled by the same factor around the same point, so car and platform grow together.
   - **Zooming out** below 100% backs the camera off instead. The car shrinks on the platform's centre, because shrinking the photo would expose its edges.
   - **Wheel and pinch.** The wheel uses a non-passive listener so it doesn't scroll the page; pinch tracks two pointers.
-- **Reflection.** An upside-down copy of the car is rendered with see-through copies of its materials. A shader hook (`fadeBelowDeck`) fades it with depth, like polished stone.
-- **Lighting.** Hemisphere, key, fill and rim lights, plus a Drei `<Environment>` built from `<Lightformer>`s for reflections. The rim light takes the service's accent colour. `LOOK` holds a night set and a day set, and GSAP tweens between them when the theme changes.
+- **Reflection (`reflection.ts`).** An upside-down copy of the car is rendered with see-through copies of its materials. A shader hook (`fadeBelowDeck`) fades it with depth, like polished stone.
+- **Lighting (`lighting.ts`).** Only the sketched car (the Toyota Limo) is lit; scans are unlit. Hemisphere, key, fill and rim lights, plus a Drei `<Environment>` built from `<Lightformer>`s for reflections. The rim light takes the service's accent colour. `LOOK` holds a night set and a day set, and GSAP tweens between them when the theme changes.
 - **Animation.** Cars roll in from the left with spinning wheels (GSAP). Picking a car flashes the glow under it yellow. Camera presets tween the turntable angle the short way round.
 
-### Sketched cars (`fleet.ts` → `carModel.ts`)
+### Sketched cars (`lib/outline.ts` → `lib/models/sketchedCar.ts`)
 
-Each car's `p` parameters (length, height, wheelbase, overhangs, hood/cowl/roof/tail points, lamp sizes and so on) describe a **side profile**. `makeProfile()` turns them into rounded outlines: the body, the glasshouse and the window panes. `buildCar()` extrudes those into a bevelled 3D body. It then adds wheels, lamps, grille, plates, mirrors, roof sign, rails, cladding or chrome, and coach details for buses. The same profile draws the 2D thumbnails and the no-WebGL fallback.
+Each car's `profile` (length, height, wheelbase, overhangs, hood/cowl/roof/tail points, lamp sizes and so on) describes its **side view**. `makeOutline()` turns it into rounded polygons: the body, the glasshouse and the window panes. `buildSketchedCar()` extrudes those into a bevelled 3D body. It then adds wheels, lamps, grille, plates, mirrors, roof sign, rails, cladding or chrome, and coach details for buses. The same outline draws the 2D roster placeholders and the no-WebGL fallback (`lib/sideView.ts`).
 
-### Scanned cars (`glbCar.ts`)
+### Scanned cars (`lib/models/scannedCar.ts`, `livery.ts`)
 
 Every scan, textured or not, goes through the same steps when it loads:
 
 1. **Decode.** The file is decoded with three's Meshopt decoder. Quantised attributes (16-bit positions, 8-bit normals) are unpacked to plain floats, so the next steps can't clip them.
 2. **Orient.** It is turned to face +x like the other cars.
-3. **Scale.** It is scaled to the car's `p.L` (length), `p.H` (roof height, measured away from the roof sign) and `p.W` (body width, measured in the rear half to skip the mirrors).
+3. **Scale.** It is scaled to the car's `profile.L` (length), `profile.H` (roof height, measured away from the roof sign) and `profile.W` (body width, measured in the rear half to skip the mirrors).
 
 What happens next depends on the scan:
 
-- **Textured scan** (all the current scans). It keeps its own PBR material and normals: colour, normal map, metalness and roughness from the file.
+- **Textured scan** (all the current scans). It is shown **unlit**: a `MeshBasicMaterial` with the file's colour texture and tone mapping off, so the stage's lights, reflections and theme don't change it and its colours reach the screen exactly as textured. (The file's normal, metalness and roughness maps go unused.)
 - **Untextured scan** (no UVs, no materials). It gets smooth normals and the Bluebird Prime livery painted in a fragment shader, by **position on the body**:
   - `u` runs from the front bumper (0) to the rear (1), `v` from the ground (0) to the roof (1), and `az` from the centre line (0) to the side (1).
   - Rules pick out the glass, lamps, plates, wheels (found from where the tyres touch the ground) and roof sign.
   - The "Bluebird PRIME" lettering and swoosh are drawn on a canvas and projected onto each side.
   - Floor-reflection copies re-apply this shader, which `material.clone()` would otherwise drop.
 
-### Roster thumbnails (`thumbs.ts`)
+### Roster thumbnails (`lib/models/thumbnails.ts`)
 
 About 0.7 s after load, a short-lived offscreen `WebGLRenderer` (with three's `RoomEnvironment`) renders every car at a front three-quarter angle. It dollies the camera until the projected bounding box fills the frame, saves each image as a PNG data URL, then disposes the renderer and frees its GL context.
 
@@ -201,38 +235,38 @@ About 0.7 s after load, a short-lived offscreen `WebGLRenderer` (with three's `R
 
 ### Add a sketched car
 
-Add an entry to `RAW` in `src/lib/fleet.ts`:
+Add an entry to `CAR_ENTRIES` in `src/data/cars.ts`. Its position sets the roster order (the first car is the one a first visit opens on):
 
 ```ts
-{ id: "avanza", cls: "bluebird", maker: "Toyota", model: "Avanza", short: "Avanza",
+{ id: "avanza", service: "bluebird", maker: "Toyota", model: "Avanza", short: "Avanza",
   paint: "#2a86d6", plate: "yellow", sign: "blue",
   blurb: "One or two sentences about this car in the fleet.",
   body: "Compact MPV", seats: "7", power: "Petrol", note: "Short fleet note",
-  r: { cap: 6, comfort: 5, eco: 5, agile: 8 },            // ratings, 0–10
-  p: { L: 4.4, W: 1.73, H: 1.7, wb: 2.75, fo: 0.83, ... } }, // side profile, metres
+  ratings: { capacity: 6, comfort: 5, eco: 5, agility: 8 },     // 0–10
+  profile: { L: 4.4, W: 1.73, H: 1.7, wb: 2.75, fo: 0.83, ... } }, // side profile, metres
 ```
 
 | Field | Meaning |
 |---|---|
 | `id` | Unique; used in `/#id` links and saved state |
-| `cls` | Service key (see below) |
+| `service` | Service key (see below) |
 | `paint` | Body colour |
 | `plate` | `"yellow"` (public transport) or `"white"` (private) |
 | `sign` | Optional roof sign: `"blue"` or `"silver"` |
-| `r` | Ratings out of 10: `cap` (seats), `comfort`, `eco`, `agile` (city agility) |
-| `p` | Profile in metres, measured from the front bumper. Anything left out takes the defaults in `D` |
+| `ratings` | Out of 10: `capacity` (shown as Seats), `comfort`, `eco`, `agility` (city agility) |
+| `profile` | Side profile in metres, measured from the front bumper. Anything left out takes `DEFAULT_PROFILE` |
 
-Main profile values:
+Every field is documented in `src/types/fleet.ts`. The main profile values:
 - **Size:** `L`, `W`, `H` (length, width, height). `L` is also shown on the info card as the car's length, so use the real figure.
 - **Wheels:** `wb` (wheelbase), `fo` (front overhang), `wr` (wheel radius), `gc` (ground clearance).
 - **Outline points:** `hoodH`, `cowlX/cowlH`, `roofX0/roofX1`, `rearX/rearH`, `tailH`.
-- **Glasshouse:** `panes` (side windows), `tumble` (how much the glasshouse narrows).
+- **Glasshouse:** `panes` (side windows), `tumble` (its width as a share of the body's).
 - **Lamps and grille:** `tail` (`"v"`, `"bar"` or `"h"`), `hl` (headlamp size, or `"round"`), `gr` (grille size, or `0` for none).
 - **Extras (set to `1`):** `rails`, `clad`, `chrome`, `bus`.
 
 The easiest start is to copy a similar car and adjust. The roster, filters, counter and thumbnails pick it up automatically.
 
-**Maker logo.** The info card's footer shows the maker's emblem straight on the card, from `MAKER_LOGO` in `fleet.ts`, keyed by `maker`. A maker that isn't listed gets its initial instead.
+**Maker logo.** The info card's footer shows the maker's emblem straight on the card, from `MAKER_LOGOS` in `src/data/makers.ts`, keyed by `maker`. A maker that isn't listed gets its initial instead.
 - **Getting one.** [Cardog Icons](https://www.npmjs.com/package/@cardog-icons/core) (MIT, about 50 brands) has most car makers: copy `optimized/<Brand> Icon.svg` from the `@cardog-icons/core` package to `public/logos/<brand>.svg`. Copy the SVG rather than importing `@cardog-icons/react`: that package ships every logo in one file that bundlers can't trim, so even one icon adds about 1 MB (gzipped) to the page.
 - **Crop it.** Trim the file's `viewBox` to the emblem itself, so every logo fills the footer slot the same way. A logo that's really a bitmap inside an SVG (as the Hino one was) is better saved as a trimmed WebP about 192 px across.
 - **Check it on the dark card.** Black or navy parts disappear there. Add a `dark` version with those parts turned white (`bmw-dark.svg`, `hyundai-dark.svg` and `hino-dark.webp` are examples); it replaces the colour one in the dark theme.
@@ -246,21 +280,22 @@ The easiest start is to copy a similar car and adjust. The roster, filters, coun
    ```
 
    Tripo exports have about 100k triangles, so they don't need simplifying; each came out at 1.1–1.4 MB. For a much denser mesh (Meshy exports reached 0.7–1.8 million triangles), replace `--simplify false` with `--simplify-ratio 0.1 --simplify-error 0.001` to keep about a tenth of the vertices. Keep your original; the optimised copy is lossy.
-2. **Check the orientation.** The loader uses the first mesh it finds and expects **y up**. Set `glbYaw` on the car to the turn that points its nose to +x:
-   - Meshy exports put the nose at −x. That's the default (`Math.PI`), so leave `glbYaw` out.
-   - Tripo exports put it at +z. Use `glbYaw: Math.PI / 2`, as on the Alphard.
+2. **Check the orientation.** The loader uses the first mesh it finds and expects **y up**. `scan.yaw` is the turn that points the nose to +x:
+   - Tripo exports put the nose at +z. That's the default (`Math.PI / 2`), so leave `yaw` out.
+   - Meshy exports put it at −x. Use `yaw: Math.PI`.
    - If the model shows up backwards, add `Math.PI`.
 
-   Units don't matter (Tripo's are centimetres); the model is scaled to `p` anyway.
+   Units don't matter (Tripo's are centimetres); the model is scaled to `profile` anyway.
 
-   The loader measures the scan's roof height and body width to scale it. If parts stick out where the body should be (for example the Model X's open falcon-wing doors), pass the measurements in the scan's own units with `glbFit: { roof, halfWidth }`.
-3. **Add the car** to `fleet.ts` as above, plus `glb: "/models/<service>/your-car.glb"`, where `<service>` is the car's `cls` (keep the file in that folder; if the car changes service, move it too). Set `p.L`, `p.H` (roof height, without any roof sign) and `p.W` (body width, without mirrors) to the real vehicle's size. If they're close to the scan's own proportions, scaling stays nearly uniform and textures don't stretch. The other `p` values are only used for the 2D fallback.
+   The loader measures the scan's roof height and body width to scale it. If parts stick out where the body should be (the Model X's open falcon-wing doors, or the Mobilio's wide roof sign), pass the measurements in the scan's own units with `fit: { roof, halfWidth }`.
+3. **Add the car** to `src/data/cars.ts` as above, plus `scan: { src: "/models/<service>/your-car.glb" }`, where `<service>` is the car's `service` (keep the file in that folder; if the car changes service, move it too). Set `profile.L`, `profile.H` (roof height, without any roof sign) and `profile.W` (body width, without mirrors) to the real vehicle's size. If they're close to the scan's own proportions, scaling stays nearly uniform and textures don't stretch. The other profile values are only used for the 2D drawing.
 4. **Untextured scans only:** the painted livery is the Bluebird Prime design, laid out in `u`/`v`/`az` proportions. Another car usually needs its region numbers adjusted (belt line, A-pillar line, lamp and plate heights, `WHEEL_R`, decal band `D0/D1/E0/E1`). View it from the Front, Side and Rear presets while you tune.
 
 ### Add a service
 
-1. Add a key to `ClassKey`, an entry in `CLASSES` (with `name`, `role` and `accent`), and the key to `ORDER` (all in `fleet.ts`).
-2. Add its badge to `public/icons/<name>.png` (transparent, roughly square) and map it in `CLASS_BADGE` in `Garage.tsx`.
+1. Add its key to `ServiceKey` in `src/types/fleet.ts`.
+2. Add an entry to `SERVICES` in `src/data/services.ts` (`name`, `role`, `accent` and `badge`), and the key to `FILTERS` where its pill should go.
+3. Add the badge to `public/icons/<name>.png` (transparent, roughly square), and a `public/models/<name>/` folder for its scans.
 
 ### Change a service badge
 
@@ -271,7 +306,7 @@ Replace `public/icons/<name>.png`. Trim any transparent margin so the badges mat
 Both photos must be **framed identically** (same platform position). If you swap them:
 
 1. Find the platform's glowing ring in the photo: its left and right edges on the centre row, and its back and front edges on the centre column.
-2. In `backdrop.ts`, set `cx`, `cy` (ring centre) and `r` (half the left-to-right width), plus `w` and `h` (photo size).
+2. In `src/lib/backdrop.ts`, set `cx`, `cy` (ring centre) and `r` (half the left-to-right width), plus `w` and `h` (photo size).
 3. Set `el = asin(ring height / ring width)` (the ring's height-to-width ratio), so the car's perspective matches.
 4. Use `posY` to choose how much of the top or bottom of the photo is cropped on wide screens.
 
@@ -306,6 +341,6 @@ Recent Chrome, Edge, Safari and Firefox.
 ## Credits
 
 - Fleet facts (models, launch dates, service history) are from public Bluebird Group announcements and press coverage.
-- The showroom photos, service badges and Bluebird icon were supplied for this project. The 14 textured models (every car except the Torana and Toyota Limo) were generated with Tripo. The BMW 2002 is a showroom piece, not part of Bluebird's recorded fleet.
+- The showroom photos, service badges and Bluebird icon were supplied for this project. The 15 textured models (every car except the Toyota Limo) were generated with Tripo. The BMW 2002 is a showroom piece, not part of Bluebird's recorded fleet.
 - Car maker emblems for BMW, BYD, Honda, Hyundai, Tesla and Toyota are from [Cardog Icons](https://www.npmjs.com/package/@cardog-icons/core), MIT © 2024 Cardog; the licence is in `public/logos/LICENSE.txt`. The Denza, Hino and Holden emblems were supplied for this project. The dark-theme versions and crops were made from these. The marks themselves belong to their manufacturers and are used here only to identify each car's maker.
 - Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and related marks belong to PT Blue Bird Tbk. This is an unofficial fan project.

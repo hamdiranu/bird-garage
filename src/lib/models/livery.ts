@@ -1,89 +1,19 @@
-/* Scanned cars from GLB files. A textured scan keeps its own material. An untextured mesh (no UVs, no
-   materials) gets the livery painted on in a shader, with regions placed in the car's own proportions:
-   u runs from the front bumper (0) to the rear (1), v from the ground (0) to the roof (1), and az from
-   the centre line (0) to the body side (1). */
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
-import type { Car } from "./fleet";
-import type { BuiltCar } from "./carModel";
+import type { Car } from "@/types/fleet";
 
-const loads = new Map<string, Promise<BuiltCar>>();
-
-export function loadGlbCar(car: Car): Promise<BuiltCar> {
-  let p = loads.get(car.id);
-  if (!p) {
-    // Models are shrunk with glTF-Transform (Meshopt geometry, WebP textures), so the loader needs the decoder.
-    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    p = loader.loadAsync(car.glb!).then((gltf) => build(car, gltf.scene));
-    loads.set(car.id, p);
-  }
-  return p;
-}
-
-/** Unpack quantised attributes (e.g. 16-bit positions limited to -1…1) into plain floats, so the geometry
-    can be moved and scaled to metres without clipping. */
-function toFloat(geo: THREE.BufferGeometry) {
-  for (const [name, a] of Object.entries(geo.attributes)) {
-    if (a instanceof THREE.BufferAttribute && a.array instanceof Float32Array && !a.normalized) continue;
-    const out = new Float32Array(a.count * a.itemSize);
-    for (let i = 0; i < a.count; i++) for (let k = 0; k < a.itemSize; k++) out[i * a.itemSize + k] = a.getComponent(i, k);
-    geo.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
-  }
-}
+/* The Bluebird Prime livery, painted in a shader onto an untextured scan (no UVs, no materials). Regions are
+   placed in the car's own proportions: u runs from the front bumper (0) to the rear (1), v from the ground (0)
+   to the roof (1), and az from the centre line (0) to the body side (1). The current scans are all textured,
+   so this is only used for an untextured one. */
 
 /* Side decal band, in u/v. */
 const D0 = 0.33, D1 = 0.97, E0 = 0.17, E1 = 0.7;
 /* Wheel radius as a share of the car's length, measured off the scan's side view. */
 const WHEEL_R = 0.079;
 
-function build(car: Car, scene: THREE.Object3D): BuiltCar {
-  scene.updateMatrixWorld(true);
-  let src: THREE.Mesh | undefined;
-  scene.traverse((n) => { if (!src && n instanceof THREE.Mesh) src = n; });
-  if (!src) throw new Error(`${car.glb}: no mesh`);
-  const srcMat = src.material as THREE.MeshStandardMaterial;
-  const textured = !!srcMat.map;
-  const geo = src.geometry.clone();
-  toFloat(geo);
-  geo.applyMatrix4(src.matrixWorld);
-  // A textured scan's normals match its normal map, so keep them; an untextured one gets smooth normals below.
-  if (!textured) geo.deleteAttribute("normal");
-  geo.rotateY(car.glbYaw ?? Math.PI); // the app's cars face +x
-
-  // Measure: roof height away from the narrow roof sign, and body width from the rear half (mirrors are up front).
-  geo.computeBoundingBox();
-  const bb = geo.boundingBox!, pos = geo.attributes.position as THREE.BufferAttribute;
-  const midX = (bb.min.x + bb.max.x) / 2, midZ = (bb.min.z + bb.max.z) / 2, halfZ = (bb.max.z - bb.min.z) / 2;
-  let roof = -Infinity, bodyHalf = 0;
-  if (car.glbFit) {
-    roof = bb.min.y + car.glbFit.roof;
-    bodyHalf = car.glbFit.halfWidth;
-  } else {
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i), z = Math.abs(pos.getZ(i) - midZ);
-      if (z > halfZ * 0.4) roof = Math.max(roof, y);
-      if (x < midX) bodyHalf = Math.max(bodyHalf, z);
-    }
-  }
-  // Length and height share one scale (close to it) so the wheels stay round; width is set on its own.
-  // (Read the scan's size now: computeBoundingBox below reuses this same Box3.)
-  const { L, H, W } = car.p;
-  const scanLen = bb.max.x - bb.min.x;
-  const sx = L / scanLen, sy = H / (roof - bb.min.y), sz = W / (2 * bodyHalf);
-  geo.translate(-midX, -bb.min.y, -midZ);
-  geo.scale(sx, sy, sz);
-  if (!textured) geo.computeVertexNormals();
-  geo.computeBoundingBox();
-
-  const group = new THREE.Group();
-  group.add(new THREE.Mesh(geo, textured ? srcMat : paintedMaterial(car, geo, scanLen, sy)));
-  return { root: group, wheels: [], height: geo.boundingBox!.max.y };
-}
-
-/** The Bluebird Prime livery for an untextured scan, fitted to its wheels. */
-function paintedMaterial(car: Car, geo: THREE.BufferGeometry, scanLen: number, sy: number) {
-  const { L, H, W } = car.p, pos = geo.attributes.position as THREE.BufferAttribute;
+/** The livery for an untextured scan already scaled to metres, fitted to its wheels. */
+export function paintedLivery(car: Car, geo: THREE.BufferGeometry, scanLen: number, sy: number) {
+  const { L, H, W } = car.profile, pos = geo.attributes.position as THREE.BufferAttribute;
 
   // Wheel centres: where the tyres touch the ground.
   const front: number[] = [], rear: number[] = [];

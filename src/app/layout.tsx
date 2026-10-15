@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Chakra_Petch } from "next/font/google";
 import "./globals.css";
-import { InlineScript } from "@/components/InlineScript";
+import { InlineScript } from "@/components/ui/InlineScript";
 import { themeScript } from "@/lib/theme";
 
 const barlow = Barlow_Condensed({
