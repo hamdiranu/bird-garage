@@ -19,6 +19,8 @@ const chakra = Chakra_Petch({
 export const metadata: Metadata = {
   title: "Bird Garage · Bluebird Group",
   description: "Car-select screen for the Bluebird Group fleet, in 3D. Unofficial.",
+  authors: [{ name: "Hamdi Ranuharja" }],
+  creator: "Hamdi Ranuharja",
 };
 
 export const viewport: Viewport = {

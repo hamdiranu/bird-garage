@@ -2,7 +2,9 @@
 
 A 3D "car select" screen for the Bluebird Group fleet, styled like a game garage. Pick a service, spin each vehicle on a showroom turntable, compare ratings, and choose a favourite.
 
-> Unofficial fan project, not affiliated with PT Blue Bird Tbk. Most 3D models are simplified sketches built from code, not manufacturer artwork. Ratings are made up for fun.
+Created by **Hamdi Ranuharja**. © 2026 Hamdi Ranuharja.
+
+> Unofficial fan project, not affiliated with PT Blue Bird Tbk. The 3D models are fan-made (generated scans), not manufacturer artwork. Ratings are made up for fun.
 
 Built with **Next.js 16**, **React 19**, **React Three Fiber**, **Drei**, **Three.js**, **GSAP** and **Tailwind CSS 4**.
 
@@ -26,12 +28,14 @@ Built with **Next.js 16**, **React 19**, **React Three Fiber**, **Drei**, **Thre
 
 - **3D showroom.** Each vehicle stands on the glowing platform of a showroom photo, with a soft floor reflection. Scanned cars are shown unlit, exactly as their textures. Drag to spin it, use the Front, Side and Rear camera presets, or zoom in from 75% to 250% (wheel, pinch, buttons or keys).
 - **16 vehicles in 6 services:** Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and Heritage. Each service has its own badge and accent colour.
-- **Scanned model support.** 15 of the 16 are textured 3D scans in their real liveries, compressed for the web (1.1–1.4 MB each); the Model X has its falcon-wing doors open. Only the Toyota Limo is still sketched from its side profile. Untextured scans can be used too; they get the livery painted on by a shader.
+- **Scanned model support.** All 16 are textured 3D scans in their real liveries, compressed for the web (1.1–1.4 MB each); the Model X has its falcon-wing doors open. A car without a scan is sketched in 3D from its side profile instead, and untextured scans get the livery painted on by a shader.
 - **Light and dark mode.** A daytime and a night-time showroom. The whole interface and the photo cross-fade together in 0.7 s.
 - **Focus view.** The side cards slide away, the car fills the stage, and its title moves to the top.
 - **Info cards.** On the left: the service, maker and model, a description, a spec grid (body, seats, power, length) and the maker's emblem with the car's fleet note. On the right: ratings out of 10 with an animated overall score and star row.
 - **Roster strip.** 3D-rendered thumbnails of every vehicle, filtered by service.
-- **Remembers your choices.** Your picked car, last-viewed car, spin and theme are saved. `/#<car-id>` links straight to a car.
+- **English and Bahasa Indonesia.** An EN | ID switch translates the whole interface and every car's description and specs, with numbers written the local way (4,39 m). A first visit follows the browser's language.
+- **Showroom mode.** For a lobby or event screen: after a minute without input the garage tours the cars on its own, and any touch, key or mouse move hands control back. Switch it on in the ☰ menu, or open `/?showroom`.
+- **Remembers your choices.** Your picked car, last-viewed car, spin, showroom mode, language and theme are saved. `/#<car-id>` links straight to a car.
 - **Responsive.** Three columns on desktop. On tablets and phones the description stays beside the car and the ratings move below.
 - **Accessible motion.** Respects `prefers-reduced-motion`. Without WebGL it falls back to a 2D side profile.
 
@@ -76,6 +80,15 @@ The page is prerendered as static HTML. Images go through `next/image`, so host 
 | Pick a car | **Select this car** (press again to unpick, or use **Clear pick**) |
 | Focus view | ⤢ button at the top right of the stage (desktop) |
 | Light / dark mode | ☀/☾ button in the header (screens 640 px and wider), or ☰ menu → Light mode |
+| Language | EN \| ID switch in the header (screens 640 px and wider), or ☰ menu → Language |
+| Showroom mode | ☰ menu → Showroom mode, or a `/?showroom` link (see below) |
+
+### Showroom mode
+
+Meant for a screen nobody is driving, such as a lobby display. Once it's on, a minute without input starts a tour: the garage moves to the next car in the current filter every 9 seconds, spinning each one (even with auto-spin off), with a "touch to explore" badge over the stage. Any touch, key, wheel or mouse move stops the tour straight away, and the next idle minute starts it again.
+
+- The ☰ menu switch is remembered.
+- A `/?showroom` link turns it on for that visit only, so a kiosk can be set up without changing saved settings. `/?showroom=20` starts the tour after 20 idle seconds instead of 60 (5–600).
 
 ### Keyboard
 
@@ -94,8 +107,9 @@ Saved in the browser's `localStorage`:
 
 | Key | Contents |
 |---|---|
-| `bluebird-fleet-select` | `{ pick, last, spin }`: your picked car, the last car viewed and auto-spin |
+| `bluebird-fleet-select` | `{ pick, last, spin, showroom }`: your picked car, the last car viewed, auto-spin and showroom mode |
 | `bluebird-theme` | `"light"` or `"dark"`. If it's missing, the system setting is used |
+| `bluebird-lang` | `"en"` or `"id"`. If it's missing, Indonesian browsers get Indonesian and everyone else English |
 
 A URL hash such as `/#e6-prime` opens that car and overrides the last-viewed one.
 
@@ -115,19 +129,20 @@ public/
     goldenbird/           Denza D9, BMW iX, Hyundai Ioniq 5
     bigbird/              Toyota Hiace, Charter Coach
     cititrans/            Hino RM280 Jetbus 5
-    heritage/             Holden Torana, BMW 2002
+    heritage/             Holden Torana, Toyota Limo, BMW 2002
 src/
   app/                    routing only
     layout.tsx            fonts, metadata, pre-paint theme script
-    page.tsx              renders <Garage />
+    page.tsx              renders <Garage /> inside the language provider
     globals.css           Tailwind setup, theme tokens, glass/brand utilities
     icon.png              favicon
   components/
     garage/               the car-select page, one file per part
       Garage.tsx          page shell: shared state, saved state, shortcuts, focus-view slide; lays out the parts
-      Header.tsx          brand, counter, theme toggle and menu, over the filter pills
+      Header.tsx          brand, counter, language and theme switches and menu, over the filter pills
       FilterPills.tsx     service filters (scroll fade, active pill kept in view)
-      HeaderMenu.tsx      ☰ menu: display switches and shortcut list
+      HeaderMenu.tsx      ☰ menu: language, display switches, showroom mode and shortcut list
+      LanguageToggle.tsx  EN | ID switch
       ThemeToggle.tsx     sun/moon button
       Showroom.tsx        the stage cell: photo, 3D view or 2D fallback, overlay, buttons
       StageButtons.tsx    prev/next, focus toggle, edge tabs
@@ -136,7 +151,7 @@ src/
       RatingsCard.tsx     right card: overall score, rating bars, select button
       Roster.tsx          car strip along the bottom
       view.ts             camera presets and zoom limits
-      use*.ts             page hooks: keyboard shortcuts, side-card inset, roster thumbnails
+      use*.ts             page hooks: keyboard shortcuts, showroom tour, side-card inset, roster thumbnails
     stage/                the 3D view (client only, loaded with next/dynamic)
       Stage.tsx           <Canvas> and its pointer/wheel input
       Scene.tsx           lights, camera framing and zoom, car swapping and roll-in
@@ -150,8 +165,11 @@ src/
     services.ts           services (name, role, accent, badge) and the filter order
     makers.ts             maker emblems
   hooks/                  reusable hooks: useMediaQuery, useElementSize, useFitText
+  i18n/                   translations
+    messages.ts           every interface string, in English and Indonesian
+    I18nProvider.tsx      current language, useI18n() for t (strings), text() (data text) and number()
   lib/                    logic, no React
-    fleet.ts              CARS (entries + defaults + outline), RATINGS and lookups
+    fleet.ts              CARS (entries + defaults + outline), RATING_KEYS and lookups
     outline.ts            side profile → body, glasshouse and window polygons
     sideView.ts           draws the 2D side view on a canvas
     models/               3D models
@@ -163,10 +181,12 @@ src/
       thumbnails.ts       renders the roster thumbnails off screen
     backdrop.ts           backdrop photos and where their platform sits
     theme.ts              light/dark resolution and persistence
+    language.ts           language resolution and persistence, localized text and numbers
     storage.ts            what the garage remembers (localStorage)
     dom.ts, format.ts     small browser and formatting helpers
   types/
     fleet.ts              Car, Service, profile and scan types, documented field by field
+    i18n.ts               Lang, and Text (one string, or one per language)
 ```
 
 Imports use the `@/` alias for `src/`. Components are PascalCase `.tsx` files; hooks are `use*.ts`. Anything that touches three.js lives under `components/stage/` or `lib/models/`, which only load once the 3D view mounts.
@@ -193,7 +213,7 @@ Imports use the `@/` alias for `src/`. Components are PascalCase `.tsx` files; h
   - **Zooming out** below 100% backs the camera off instead. The car shrinks on the platform's centre, because shrinking the photo would expose its edges.
   - **Wheel and pinch.** The wheel uses a non-passive listener so it doesn't scroll the page; pinch tracks two pointers.
 - **Reflection (`reflection.ts`).** An upside-down copy of the car is rendered with see-through copies of its materials. A shader hook (`fadeBelowDeck`) fades it with depth, like polished stone.
-- **Lighting (`lighting.ts`).** Only the sketched car (the Toyota Limo) is lit; scans are unlit. Hemisphere, key, fill and rim lights, plus a Drei `<Environment>` built from `<Lightformer>`s for reflections. The rim light takes the service's accent colour. `LOOK` holds a night set and a day set, and GSAP tweens between them when the theme changes.
+- **Lighting (`lighting.ts`).** Only sketched cars are lit (none in the current fleet); scans are unlit. Hemisphere, key, fill and rim lights, plus a Drei `<Environment>` built from `<Lightformer>`s for reflections. The rim light takes the service's accent colour. `LOOK` holds a night set and a day set, and GSAP tweens between them when the theme changes.
 - **Animation.** Cars roll in from the left with spinning wheels (GSAP). Picking a car flashes the glow under it yellow. Camera presets tween the turntable angle the short way round.
 
 ### Sketched cars (`lib/outline.ts` → `lib/models/sketchedCar.ts`)
@@ -240,8 +260,9 @@ Add an entry to `CAR_ENTRIES` in `src/data/cars.ts`. Its position sets the roste
 ```ts
 { id: "avanza", service: "bluebird", maker: "Toyota", model: "Avanza", short: "Avanza",
   paint: "#2a86d6", plate: "yellow", sign: "blue",
-  blurb: "One or two sentences about this car in the fleet.",
-  body: "Compact MPV", seats: "7", power: "Petrol", note: "Short fleet note",
+  blurb: { en: "One or two sentences about this car in the fleet.", id: "Satu atau dua kalimat tentang mobil ini." },
+  body: { en: "Compact MPV", id: "MPV kompak" }, seats: "7", power: { en: "Petrol", id: "Bensin" },
+  note: { en: "Short fleet note", id: "Catatan singkat armada" },
   ratings: { capacity: 6, comfort: 5, eco: 5, agility: 8 },     // 0–10
   profile: { L: 4.4, W: 1.73, H: 1.7, wb: 2.75, fo: 0.83, ... } }, // side profile, metres
 ```
@@ -255,6 +276,7 @@ Add an entry to `CAR_ENTRIES` in `src/data/cars.ts`. Its position sets the roste
 | `sign` | Optional roof sign: `"blue"` or `"silver"` |
 | `ratings` | Out of 10: `capacity` (shown as Seats), `comfort`, `eco`, `agility` (city agility) |
 | `profile` | Side profile in metres, measured from the front bumper. Anything left out takes `DEFAULT_PROFILE` |
+| `blurb`, `body`, `seats`, `power`, `note` | Shown to visitors: `{ en, id }`, or one string when it reads the same in both (a number, `"Sedan"`, `"Diesel"`) |
 
 Every field is documented in `src/types/fleet.ts`. The main profile values:
 - **Size:** `L`, `W`, `H` (length, width, height). `L` is also shown on the info card as the car's length, so use the real figure.
@@ -294,8 +316,14 @@ The easiest start is to copy a similar car and adjust. The roster, filters, coun
 ### Add a service
 
 1. Add its key to `ServiceKey` in `src/types/fleet.ts`.
-2. Add an entry to `SERVICES` in `src/data/services.ts` (`name`, `role`, `accent` and `badge`), and the key to `FILTERS` where its pill should go.
+2. Add an entry to `SERVICES` in `src/data/services.ts` (`name`, `role` in both languages, `accent` and `badge`), and the key to `FILTERS` where its pill should go.
 3. Add the badge to `public/icons/<name>.png` (transparent, roughly square), and a `public/models/<name>/` folder for its scans.
+
+### Change or add interface text
+
+Every interface string is in `src/i18n/messages.ts`, once for English (`en`) and once for Indonesian (`id`). The Indonesian set is typed against the English one, so adding a string to one and not the other, or misspelling a key, fails the type check. Components read them with `const { t } = useI18n()` (for example `t.ratings.select`); car and service text goes through `text()`, and numbers through `number()`, which writes "4,39" in Indonesian.
+
+The page is prerendered in English and switches to the visitor's language as it hydrates, so an Indonesian first visit can show English for a moment while the page loads.
 
 ### Change a service badge
 
@@ -340,7 +368,8 @@ Recent Chrome, Edge, Safari and Firefox.
 
 ## Credits
 
+- Bird Garage was created by Hamdi Ranuharja. © 2026 Hamdi Ranuharja.
 - Fleet facts (models, launch dates, service history) are from public Bluebird Group announcements and press coverage.
-- The showroom photos, service badges and Bluebird icon were supplied for this project. The 15 textured models (every car except the Toyota Limo) were generated with Tripo. The BMW 2002 is a showroom piece, not part of Bluebird's recorded fleet.
+- The showroom photos, service badges and Bluebird icon were supplied for this project. All 16 textured models were generated with Tripo. The BMW 2002 is a showroom piece, not part of Bluebird's recorded fleet.
 - Car maker emblems for BMW, BYD, Honda, Hyundai, Tesla and Toyota are from [Cardog Icons](https://www.npmjs.com/package/@cardog-icons/core), MIT © 2024 Cardog; the licence is in `public/logos/LICENSE.txt`. The Denza, Hino and Holden emblems were supplied for this project. The dark-theme versions and crops were made from these. The marks themselves belong to their manufacturers and are used here only to identify each car's maker.
 - Bluebird, Silverbird, Goldenbird, Bigbird, Cititrans and related marks belong to PT Blue Bird Tbk. This is an unofficial fan project.

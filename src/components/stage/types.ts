@@ -30,6 +30,8 @@ export interface Frame {
 
 export interface StageProps {
   car: Car;
+  /** Accessible description of the view, in the visitor's language. */
+  label: string;
   accent: string;
   /** Bumped when the car should roll in rather than appear in place. */
   rollKey: number;

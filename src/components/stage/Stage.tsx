@@ -15,7 +15,7 @@ export default function Stage(props: StageProps) {
       ref={ref}
       className="absolute inset-0 cursor-grab touch-pan-y data-[drag=true]:cursor-grabbing"
       role="img"
-      aria-label={`3D model of the ${props.car.maker} ${props.car.model}. Drag to rotate, scroll or pinch to zoom.`}
+      aria-label={props.label}
       {...handlers}
     >
       <Canvas

@@ -5,6 +5,7 @@ import { useGSAP } from "@gsap/react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { MAKER_LOGOS } from "@/data/makers";
 import { useFitText } from "@/hooks/useFitText";
+import { useI18n } from "@/i18n/I18nProvider";
 import type { Car, Service } from "@/types/fleet";
 
 interface InfoCardProps {
@@ -18,6 +19,7 @@ interface InfoCardProps {
 /** Left card: the service, maker and model, the blurb, a spec grid, and the maker's emblem with the car's
     fleet note. Spacing (--gap) grows with the screen's height, so short laptop screens stay compact. */
 export function InfoCard({ cardRef, car, service, reduceMotion }: InfoCardProps) {
+  const { text } = useI18n();
   const modelRef = useRef<HTMLHeadingElement>(null);
   useFitText(modelRef, car);
 
@@ -39,7 +41,7 @@ export function InfoCard({ cardRef, car, service, reduceMotion }: InfoCardProps)
         <p className="rounded-md bg-accent px-2.5 py-[5px] text-[10px] font-semibold uppercase leading-none tracking-[.1em] text-(--on-accent) shadow-[0_0_16px_color-mix(in_srgb,var(--accent)_30%,transparent)] transition-colors duration-300 md:text-[11px]">
           {service.name}
         </p>
-        <p className="hidden text-xs leading-none text-soft sm:block md:text-[13px]">{service.role}</p>
+        <p className="hidden text-xs leading-none text-soft sm:block md:text-[13px]">{text(service.role)}</p>
       </div>
       <p data-anim className="text-sm font-medium uppercase leading-none tracking-[.1em] text-soft md:text-lg 2xl:text-[22px]">{car.maker}</p>
       <h2
@@ -48,7 +50,7 @@ export function InfoCard({ cardRef, car, service, reduceMotion }: InfoCardProps)
       >
         {car.model}
       </h2>
-      <p data-anim className="max-w-[42ch] pb-(--gap) text-[12.5px] leading-[1.55] text-soft md:text-[15px] lg:text-sm lg:leading-normal 2xl:text-base 2xl:leading-[1.6]">{car.blurb}</p>
+      <p data-anim className="max-w-[42ch] pb-(--gap) text-[12.5px] leading-[1.55] text-soft md:text-[15px] lg:text-sm lg:leading-normal 2xl:text-base 2xl:leading-[1.6]">{text(car.blurb)}</p>
 
       <SpecGrid car={car} />
       <MakerFooter car={car} />
@@ -59,11 +61,12 @@ export function InfoCard({ cardRef, car, service, reduceMotion }: InfoCardProps)
 /** Two columns under a hairline, split by a short rule (phones stack them). On a tall card the grid centres in
     the spare room and the maker footer drops to the bottom. */
 function SpecGrid({ car }: { car: Car }) {
+  const { t, text, number } = useI18n();
   const specs: [label: string, value: string, icon: IconName][] = [
-    ["Body", car.body, "car"],
-    ["Seats", car.seats, "users"],
-    ["Power", car.power, "bolt"],
-    ["Length", `${+car.profile.L.toFixed(2)} m`, "ruler"],
+    [t.specs.body, text(car.body), "car"],
+    [t.specs.seats, text(car.seats), "users"],
+    [t.specs.power, text(car.power), "bolt"],
+    [t.specs.length, `${number(car.profile.L, { max: 2 })} m`, "ruler"],
   ];
   return (
     <dl data-anim className="my-auto grid grid-cols-1 border-t border-edge sm:grid-cols-2">
@@ -87,6 +90,7 @@ function SpecGrid({ car }: { car: Car }) {
 /** The maker's emblem (or initial), name, and the car's place in the fleet. The emblem's slot is a little wider
     than tall so round and wide emblems look about the same size; the dark version swaps in by theme. */
 function MakerFooter({ car }: { car: Car }) {
+  const { text } = useI18n();
   const logo = MAKER_LOGOS[car.maker];
   const emblem = "col-start-1 row-start-1 h-full w-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,.35)]";
   return (
@@ -103,7 +107,7 @@ function MakerFooter({ car }: { car: Car }) {
       </span>
       <div className="min-w-0">
         <p className="text-sm font-semibold leading-tight 2xl:text-[15px]">{car.maker}</p>
-        <p className="mt-0.5 text-xs leading-snug text-soft 2xl:text-[13px]">{car.note}</p>
+        <p className="mt-0.5 text-xs leading-snug text-soft 2xl:text-[13px]">{text(car.note)}</p>
       </div>
     </div>
   );

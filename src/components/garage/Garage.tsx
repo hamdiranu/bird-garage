@@ -6,6 +6,7 @@ import { useGSAP } from "@gsap/react";
 import type { Rig } from "@/components/stage/types";
 import { SERVICES } from "@/data/services";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useI18n } from "@/i18n/I18nProvider";
 import { hasWebGL } from "@/lib/dom";
 import { CARS, carsInFilter, findCar } from "@/lib/fleet";
 import { loadGarage, saveGarage } from "@/lib/storage";
@@ -18,6 +19,7 @@ import { Roster } from "./Roster";
 import { Showroom } from "./Showroom";
 import { Toolbar, type ToolbarProps } from "./Toolbar";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+import { DEFAULT_IDLE_MS, useShowroomTour } from "./useShowroomTour";
 import { useSideCardInset } from "./useSideCardInset";
 import { VIEWS, ZOOM, clampZoom, shortestTurn, type ViewKey } from "./view";
 
@@ -26,11 +28,18 @@ gsap.registerPlugin(useGSAP);
 /** The car-select screen: header, the stage between the info and ratings cards, and the roster. This component
     owns the state they share; each part handles its own layout and animation. */
 export default function Garage() {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<FilterKey>("all");
   /** Index into CARS of the car on stage. */
   const [current, setCurrent] = useState(0);
   const [pick, setPick] = useState<string | null>(null);
   const [spin, setSpin] = useState(true);
+  /** Showroom mode: tour the cars when nobody is using the screen. */
+  const [showroom, setShowroom] = useState(false);
+  /** How long the screen sits idle before the tour starts; ?showroom=N sets it in seconds. */
+  const [tourIdleMs, setTourIdleMs] = useState(DEFAULT_IDLE_MS);
+  /** Showroom mode came from a ?showroom link: it lasts for this visit only, until the menu switch is used. */
+  const showroomFromLink = useRef(false);
   const [focus, setFocus] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [theme, setTheme] = useState<Theme>("dark");
@@ -61,13 +70,14 @@ export default function Garage() {
   // The <head> script already set data-theme; React's dev remount strips it from <html>, so put it back
   // before paint. Runs before the effect below enables the 3D stage, so the stage mounts lit for this theme.
   useLayoutEffect(() => {
-    const t = resolveTheme();
-    applyTheme(t);
-    setTheme(t);
+    const initial = resolveTheme();
+    applyTheme(initial);
+    setTheme(initial);
   }, []);
 
   // Restore the last visit, then let a /#car-id link override the car. Auto-spin stays off if it was turned off,
-  // or if the visitor prefers reduced motion.
+  // or if the visitor prefers reduced motion. A ?showroom link switches showroom mode on, for kiosk screens
+  // (?showroom=20 starts the tour after 20 idle seconds instead of 60).
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     setReduceMotion(reduce);
@@ -78,18 +88,18 @@ export default function Garage() {
     const linked = findCar(location.hash.slice(1));
     if (linked >= 0) setCurrent(linked);
     setSpin(!reduce && saved.spin !== false);
+    const kiosk = new URLSearchParams(location.search).get("showroom");
+    showroomFromLink.current = kiosk !== null && saved.showroom !== true;
+    setShowroom(saved.showroom === true || kiosk !== null);
+    const idleSeconds = Number(kiosk);
+    if (kiosk && idleSeconds >= 5 && idleSeconds <= 600) setTourIdleMs(idleSeconds * 1000);
     setGl(hasWebGL());
     setRestored(true);
   }, []);
 
   useEffect(() => {
-    if (restored) saveGarage({ pick, last: car.id, spin });
-  }, [restored, pick, car.id, spin]);
-
-  useEffect(() => {
-    rig.spin = spin;
-    rig.lastInput = -1e9;
-  }, [spin, rig]);
+    if (restored) saveGarage({ pick, last: car.id, spin, showroom: showroom && !showroomFromLink.current });
+  }, [restored, pick, car.id, spin, showroom]);
 
   /* ---------- actions ---------- */
 
@@ -132,6 +142,13 @@ export default function Garage() {
     gsap.to(rig, { yaw: rig.yaw + shortestTurn(rig.yaw, VIEWS[view]), duration: reduceMotion ? 0 : 0.8, ease: "power3.inOut", overwrite: "auto" });
   };
 
+  // Showroom mode tours the cars in the current filter, spinning each one even with auto-spin off.
+  const touring = useShowroomTour(showroom, () => step(1), tourIdleMs);
+  useEffect(() => {
+    rig.spin = spin || touring;
+    rig.lastInput = -1e9;
+  }, [spin, touring, rig]);
+
   useKeyboardShortcuts({
     prev: () => step(-1),
     next: () => step(1),
@@ -172,6 +189,8 @@ export default function Garage() {
         onToggleFocus={() => setFocus((f) => !f)}
         spin={spin}
         onToggleSpin={() => setSpin((s) => !s)}
+        showroom={showroom}
+        onToggleShowroom={() => { showroomFromLink.current = false; setShowroom((s) => !s); }}
         reduceMotion={reduceMotion}
       />
 
@@ -193,6 +212,7 @@ export default function Garage() {
           isLg={isLg}
           focused={focused}
           picked={picked}
+          touring={touring}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
           onToggleFocus={() => setFocus((f) => !f)}
@@ -217,8 +237,9 @@ export default function Garage() {
       <Roster current={current} filter={filter} pick={pick} rollKey={rollKey} reduceMotion={reduceMotion} gl={gl} onSelect={goTo} />
 
       <footer className="relative z-20 flex flex-wrap justify-between gap-x-6 gap-y-1 bg-(--foot) px-gut py-2 text-[10.5px] leading-normal text-dim">
-        <span>Group fleet: 24,500+ vehicles in 20 cities, as reported in 2025.</span>
-        <span>Unofficial fan showcase, not affiliated with PT Blue Bird Tbk. The 3D models are simplified sketches, not manufacturer artwork.</span>
+        <span>{t.footer.fleet}</span>
+        <span>{t.footer.disclaimer}</span>
+        <span className="text-soft">{t.footer.credit}</span>
       </footer>
     </div>
   );

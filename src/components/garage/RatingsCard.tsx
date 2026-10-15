@@ -2,7 +2,8 @@ import { useRef, type RefObject } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Icon, StarFill, type IconName } from "@/components/ui/Icon";
-import { RATINGS, overallRating } from "@/lib/fleet";
+import { useI18n } from "@/i18n/I18nProvider";
+import { RATING_KEYS, overallRating } from "@/lib/fleet";
 import type { Car, RatingKey } from "@/types/fleet";
 
 const RATING_ICON: Record<RatingKey, IconName> = { capacity: "seat", comfort: "sofa", eco: "leaf", agility: "city" };
@@ -23,19 +24,20 @@ interface RatingsCardProps {
 /** Right card: the overall score with stars, a bar per rating, and the select button. On tablets it lays out
     as two columns, ratings beside the button. */
 export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onChangeCar, onClearPick, reduceMotion }: RatingsCardProps) {
+  const { t, number } = useI18n();
   const overall = overallRating(car);
   const scoreRef = useRef<HTMLSpanElement>(null);
   const shown = useRef({ value: overall });
   /** Rendered as the score's text at first; afterwards GSAP writes it while counting. */
-  const firstScore = useRef(overall.toFixed(1)).current;
+  const firstScore = useRef(number(overall, { min: 1 })).current;
 
-  // The overall score counts to its new value.
+  // The overall score counts to its new value (and is rewritten in the new format when the language changes).
   useGSAP(() => {
     const el = scoreRef.current;
     if (!el) return;
-    const write = () => { el.textContent = shown.current.value.toFixed(1); };
+    const write = () => { el.textContent = number(shown.current.value, { min: 1 }); };
     gsap.to(shown.current, { value: overall, duration: reduceMotion ? 0 : 0.6, ease: "power2.out", overwrite: true, onUpdate: write, onComplete: write });
-  }, { dependencies: [overall, reduceMotion] });
+  }, { dependencies: [overall, reduceMotion, number] });
 
   return (
     <section
@@ -50,10 +52,10 @@ export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onCha
           </span>
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase leading-none tracking-[.16em] text-soft md:text-xs">
-              Overall rating
-              <span title="Ratings are this site's, for fun." className="text-dim">
+              {t.ratings.overall}
+              <span title={t.ratings.disclaimer} className="text-dim">
                 <Icon name="info" className="h-3.5 w-3.5" />
-                <span className="sr-only">(ratings are this site&apos;s, for fun)</span>
+                <span className="sr-only">({t.ratings.disclaimer})</span>
               </span>
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -68,8 +70,8 @@ export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onCha
 
         {/* one row per rating: label and score, then its bar; the rows spread out on a tall card */}
         <div className="mt-(--gap) grid gap-x-8 gap-y-[clamp(14px,2.4vh,26px)] border-t border-edge pt-(--gap) sm:grid-cols-2 lg:flex lg:flex-1 lg:flex-col lg:justify-evenly">
-          {RATINGS.map(({ key, label }) => (
-            <RatingRow key={key} icon={RATING_ICON[key]} label={label} value={car.ratings[key]} />
+          {RATING_KEYS.map((key) => (
+            <RatingRow key={key} icon={RATING_ICON[key]} label={t.ratings[key]} value={car.ratings[key]} />
           ))}
         </div>
       </div>
@@ -81,12 +83,12 @@ export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onCha
           className={`flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[linear-gradient(180deg,#ffd84a,#f5b50f)] text-lg font-semibold uppercase tracking-[.08em] text-[#14140f] transition-[filter,box-shadow] md:text-xl ${picked ? "shadow-[0_0_28px_rgba(245,197,24,.45),inset_0_1px_0_rgba(255,255,255,.5)]" : "shadow-[0_0_18px_rgba(245,197,24,.25),inset_0_1px_0_rgba(255,255,255,.5)] hover:brightness-110"}`}
         >
           {picked && <Icon name="check" className="h-6 w-6" strokeWidth={3} />}
-          {picked ? "Selected" : "Select this car"}
+          {picked ? t.ratings.selected : t.ratings.select}
           {!picked && <Icon name="arrowRight" className="h-5 w-5" strokeWidth={2.4} />}
         </button>
         <div className="mt-3 flex items-center justify-center gap-1 text-xs text-dim">
           <button onClick={onChangeCar} className="flex items-center gap-1.5 whitespace-nowrap px-2 py-1 transition-colors hover:text-ink">
-            <Icon name="swap" className="h-4 w-4" /> Change car
+            <Icon name="swap" className="h-4 w-4" /> {t.ratings.changeCar}
           </button>
           <span aria-hidden="true">•</span>
           <button
@@ -94,7 +96,7 @@ export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onCha
             disabled={!hasPick}
             className="flex items-center gap-1.5 whitespace-nowrap px-2 py-1 transition-colors enabled:hover:text-ink disabled:opacity-50"
           >
-            <Icon name="x" className="h-4 w-4" /> Clear pick
+            <Icon name="x" className="h-4 w-4" /> {t.ratings.clearPick}
           </button>
         </div>
       </div>

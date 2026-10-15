@@ -10,6 +10,8 @@ export interface SavedGarage {
   last?: string;
   /** Auto-spin, when they turned it off. */
   spin?: boolean;
+  /** Showroom mode (touring the cars when nobody is using the screen). */
+  showroom?: boolean;
 }
 
 export function loadGarage(): SavedGarage {
@@ -19,13 +21,14 @@ export function loadGarage(): SavedGarage {
       pick: typeof saved.pick === "string" ? saved.pick : undefined,
       last: typeof saved.last === "string" ? saved.last : undefined,
       spin: typeof saved.spin === "boolean" ? saved.spin : undefined,
+      showroom: typeof saved.showroom === "boolean" ? saved.showroom : undefined,
     };
   } catch {
     return {};
   }
 }
 
-export function saveGarage(state: { pick: string | null; last: string; spin: boolean }) {
+export function saveGarage(state: { pick: string | null; last: string; spin: boolean; showroom: boolean }) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {}

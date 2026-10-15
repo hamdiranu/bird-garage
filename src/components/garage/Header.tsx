@@ -5,6 +5,7 @@ import type { Theme } from "@/lib/theme";
 import type { FilterKey } from "@/types/fleet";
 import { FilterPills } from "./FilterPills";
 import { HeaderMenu } from "./HeaderMenu";
+import { LanguageToggle } from "./LanguageToggle";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface HeaderProps {
@@ -20,12 +21,16 @@ interface HeaderProps {
   onToggleFocus: () => void;
   spin: boolean;
   onToggleSpin: () => void;
+  showroom: boolean;
+  onToggleShowroom: () => void;
   reduceMotion: boolean;
 }
 
-/** One row from tablet up: brand | filter pills (scrolling sideways if they run out of room) | counter, theme
-    and menu. Phones put the pills on a row of their own. */
-export function Header({ filter, onFilter, position, count, theme, onToggleTheme, focus, canFocus, onToggleFocus, spin, onToggleSpin, reduceMotion }: HeaderProps) {
+/** One row from tablet up: brand | filter pills (scrolling sideways if they run out of room) | counter,
+    language, theme and menu. Phones put the pills on a row of their own, and keep language and theme in the menu. */
+export function Header({
+  filter, onFilter, position, count, theme, onToggleTheme, focus, canFocus, onToggleFocus, spin, onToggleSpin, showroom, onToggleShowroom, reduceMotion,
+}: HeaderProps) {
   return (
     <header className="relative z-30 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-b border-edge bg-[linear-gradient(180deg,var(--hdr-a),var(--hdr-b))] px-gut shadow-[0_8px_30px_-12px_var(--drop)] backdrop-blur-md md:flex md:gap-x-2 2xl:gap-x-5">
       <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2.5 py-2.5 md:flex-none" aria-label="Bird Garage">
@@ -42,6 +47,7 @@ export function Header({ filter, onFilter, position, count, theme, onToggleTheme
           <b className="font-display text-[22px] font-bold leading-none text-plate [text-shadow:0_0_12px_rgba(245,197,24,.45)] 2xl:text-[26px]">{twoDigits(position + 1)}</b>
           <span className="text-xs font-semibold text-dim">/ {twoDigits(count)}</span>
         </div>
+        <LanguageToggle className="hidden sm:flex" />
         <ThemeToggle theme={theme} onToggle={onToggleTheme} className="hidden sm:grid" />
         <HeaderMenu
           light={theme === "light"}
@@ -51,6 +57,8 @@ export function Header({ filter, onFilter, position, count, theme, onToggleTheme
           onToggleFocus={onToggleFocus}
           spin={spin}
           onToggleSpin={onToggleSpin}
+          showroom={showroom}
+          onToggleShowroom={onToggleShowroom}
         />
       </div>
 

@@ -9,17 +9,12 @@ export const CARS: Car[] = CAR_ENTRIES.map((entry) => {
   return { ...entry, profile, outline: makeOutline(profile) };
 });
 
-/** The ratings, in the order the ratings card lists them. */
-export const RATINGS: { key: RatingKey; label: string }[] = [
-  { key: "capacity", label: "Seats" },
-  { key: "comfort", label: "Comfort" },
-  { key: "eco", label: "Eco" },
-  { key: "agility", label: "City agility" },
-];
+/** The ratings, in the order the ratings card lists them (their labels are in i18n/messages.ts). */
+export const RATING_KEYS: RatingKey[] = ["capacity", "comfort", "eco", "agility"];
 
 /** Mean of a car's ratings, out of 10. */
 export function overallRating(car: Car) {
-  return RATINGS.reduce((sum, { key }) => sum + car.ratings[key], 0) / RATINGS.length;
+  return RATING_KEYS.reduce((sum, key) => sum + car.ratings[key], 0) / RATING_KEYS.length;
 }
 
 export function matchesFilter(car: Car, filter: FilterKey) {

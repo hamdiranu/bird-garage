@@ -1,3 +1,5 @@
+import type { Text } from "./i18n";
+
 /* Shared types for the fleet: services, cars, ratings and the side profile each car is drawn from. */
 
 /** A Bluebird Group service, e.g. the regular Bluebird taxis or the Goldenbird rental cars. */
@@ -8,7 +10,7 @@ export type FilterKey = "all" | ServiceKey;
 export interface Service {
   name: string;
   /** What the service does, shown beside its name. */
-  role: string;
+  role: Text;
   /** Accent colour for the car on stage, the rating bars and the pill. */
   accent: string;
   /** Square badge in public/icons. */
@@ -79,12 +81,12 @@ export interface CarEntry {
   plate: "yellow" | "white";
   /** Optional taxi roof sign. */
   sign?: "blue" | "silver";
-  blurb: string;
-  body: string;
-  seats: string;
-  power: string;
+  blurb: Text;
+  body: Text;
+  seats: Text;
+  power: Text;
   /** The car's place in the fleet, shown under the maker's emblem. */
-  note: string;
+  note: Text;
   ratings: Record<RatingKey, number>;
   scan?: Scan;
   profile: Partial<ProfileParams>;

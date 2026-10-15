@@ -6,6 +6,7 @@ import type { Frame, Rig } from "@/components/stage/types";
 import { Icon } from "@/components/ui/Icon";
 import SideView from "@/components/ui/SideView";
 import { useElementSize } from "@/hooks/useElementSize";
+import { useI18n } from "@/i18n/I18nProvider";
 import { backdropStyle } from "@/lib/backdrop";
 import type { Theme } from "@/lib/theme";
 import type { Car, Service } from "@/types/fleet";
@@ -34,6 +35,8 @@ interface ShowroomProps {
   isLg: boolean;
   focused: boolean;
   picked: boolean;
+  /** Showroom mode is touring the cars on its own. */
+  touring: boolean;
   onPrev: () => void;
   onNext: () => void;
   onToggleFocus: () => void;
@@ -45,9 +48,10 @@ interface ShowroomProps {
 /** The stage: the showroom photo with the 3D car on its platform (or a 2D drawing without WebGL), the overlay
     above it and the buttons around it. A grid cell on small screens; full-bleed behind the cards on large ones. */
 export function Showroom({
-  car, service, theme, gl, rig, rollKey, zoom, onZoom, reduceMotion, inset, isLg, focused, picked,
+  car, service, theme, gl, rig, rollKey, zoom, onZoom, reduceMotion, inset, isLg, focused, picked, touring,
   onPrev, onNext, onToggleFocus, onExitFocus, toolbar,
 }: ShowroomProps) {
+  const { t, text } = useI18n();
   const viewRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -107,7 +111,7 @@ export function Showroom({
       </div>
       {gl && (
         <Stage
-          car={car} accent={service.accent} rollKey={rollKey} rig={rig} reduceMotion={reduceMotion} frame={frame} theme={theme}
+          car={car} label={t.stage.model(car.maker, car.model)} accent={service.accent} rollKey={rollKey} rig={rig} reduceMotion={reduceMotion} frame={frame} theme={theme}
           zoom={zoom} onZoom={onZoom} backdrop={backdropRef}
         />
       )}
@@ -115,7 +119,7 @@ export function Showroom({
         <>
           <SideView car={car} width={Math.max(200, viewSize.width)} height={Math.max(160, viewSize.height)} pad={Math.max(30, viewSize.width * 0.12)} className="absolute inset-0" />
           <p className="absolute inset-x-4 bottom-[70px] z-[2] text-center text-xs text-dim">
-            This browser has WebGL switched off, so the 3D view can&apos;t run. Showing the side profile instead.
+            {t.stage.noWebGL}
           </p>
         </>
       )}
@@ -129,23 +133,29 @@ export function Showroom({
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-28 bg-gradient-to-b from-[color-mix(in_srgb,var(--shade)_70%,transparent)] to-transparent" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-24 bg-gradient-to-t from-[color-mix(in_srgb,var(--shade)_80%,transparent)] to-transparent" />
 
-      {/* top overlay: drag hint, or the car's title in focus view; then the "Selected" stamp */}
+      {/* top overlay: drag hint (or the showroom-mode badge while touring), or the car's title in focus view;
+          then the "Selected" stamp */}
       <div ref={overlayRef} className="pointer-events-none absolute inset-x-0 top-3 z-[2] flex flex-col items-center gap-2 px-3 text-center md:top-5 md:px-12">
         {focused ? (
           <div ref={titleRef} className="flex flex-col items-center gap-1.5">
             <p className="text-sm font-semibold uppercase tracking-[.3em] text-soft">{car.maker}</p>
             <h2 className="font-display text-[clamp(40px,4.6vw,68px)] font-extrabold italic uppercase leading-[.9] tracking-[.01em] [text-shadow:0_4px_30px_var(--title-glow)]">{car.model}</h2>
             <p className="mt-1 rounded-full border border-accent/70 bg-(--float) px-4 py-1 text-[11px] font-semibold uppercase tracking-[.16em] text-accent">
-              {service.name} · {service.role}
+              {service.name} · {text(service.role)}
             </p>
           </div>
+        ) : touring ? (
+          <p className="flex items-center gap-2 whitespace-nowrap rounded-full border border-accent/60 bg-(--float) px-3 py-1.5 text-[10px] font-semibold uppercase leading-[1.3] tracking-[.16em] text-accent backdrop-blur-sm md:px-3.5 md:text-xs">
+            <Icon name="play" className="h-4 w-4 flex-none md:h-5 md:w-5" />
+            {t.stage.touring}
+          </p>
         ) : (
           gl && (
             <p className="flex items-center gap-2 whitespace-nowrap rounded-full bg-(--float) px-3 py-1.5 md:px-3.5 text-[10px] font-medium uppercase leading-[1.3] tracking-[.16em] text-soft backdrop-blur-sm md:text-xs">
               <Icon name="hand" className="h-4 w-4 flex-none md:h-5 md:w-5" />
-              <span className="sm:hidden">Drag · Pinch</span>
-              <span className="hidden sm:inline lg:hidden">Drag to rotate · Pinch to zoom</span>
-              <span className="hidden lg:inline">Drag to rotate · Scroll to zoom</span>
+              <span className="sm:hidden">{t.stage.hintPhone}</span>
+              <span className="hidden sm:inline lg:hidden">{t.stage.hintTablet}</span>
+              <span className="hidden lg:inline">{t.stage.hintDesktop}</span>
             </p>
           )
         )}
@@ -154,7 +164,7 @@ export function Showroom({
             ref={stampRef}
             className="rounded-full border-2 border-plate bg-(--float) px-5 pb-1 pt-1.5 text-xs font-semibold uppercase leading-none tracking-[.14em] text-plate shadow-[0_0_18px_rgba(245,197,24,.35)] md:text-sm"
           >
-            Selected
+            {t.stage.selected}
           </p>
         )}
       </div>
