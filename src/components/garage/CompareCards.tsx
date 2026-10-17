@@ -5,11 +5,11 @@ import { SERVICES } from "@/data/services";
 import { useI18n } from "@/i18n/I18nProvider";
 import { RATING_KEYS, overallRating } from "@/lib/fleet";
 import type { Car, RatingKey } from "@/types/fleet";
+import { RATING_ICON } from "./ratingIcons";
 
 /* Compare mode puts these in place of the info and ratings cards: the pinned car is always on the left (as on the
    stage) and the current car on the right, each column marked in its service colour. */
 
-const RATING_ICON: Record<RatingKey, IconName> = { capacity: "seat", comfort: "sofa", eco: "leaf", agility: "city" };
 
 interface CompareProps {
   /** The card's element; the page measures it and slides it away for focus view. */

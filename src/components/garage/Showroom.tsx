@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Re
 import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import type { Frame, HotspotDots, Rig } from "@/components/stage/types";
+import type { Frame, HotspotDots, RigRef } from "@/components/stage/types";
 import { Icon } from "@/components/ui/Icon";
 import SideView from "@/components/ui/SideView";
 import { useElementSize } from "@/hooks/useElementSize";
@@ -29,7 +29,7 @@ interface ShowroomProps {
   theme: Theme;
   /** WebGL support: null until checked. */
   gl: boolean | null;
-  rig: Rig;
+  rigRef: RigRef;
   rollKey: number;
   zoom: number;
   onZoom: (factor: number) => void;
@@ -57,7 +57,7 @@ interface ShowroomProps {
     above it, the hotspot dots and the buttons around it. The top grid cell on phones, beside the info card on
     tablets, and full-bleed behind the cards on large screens. */
 export function Showroom({
-  car, service, pinned, theme, gl, rig, rollKey, zoom, onZoom, reduceMotion, inset, isLg, focused, picked, touring, hotspotsOn, capture,
+  car, service, pinned, theme, gl, rigRef, rollKey, zoom, onZoom, reduceMotion, inset, isLg, focused, picked, touring, hotspotsOn, capture,
   onPrev, onNext, onToggleFocus, onExitFocus, toolbar,
 }: ShowroomProps) {
   const { t, text } = useI18n();
@@ -134,8 +134,8 @@ export function Showroom({
       {gl && (
         <Stage
           car={car} pinned={pinned} label={pinned ? `${t.stage.model(pinned.maker, pinned.model)} ${t.stage.model(car.maker, car.model)}` : t.stage.model(car.maker, car.model)}
-          accent={service.accent} rollKey={rollKey} rig={rig} reduceMotion={reduceMotion} frame={frame} theme={theme}
-          zoom={zoom} onZoom={onZoom} backdrop={backdropRef} hotspots={hotspots} onReady={capture ? () => setReady(true) : undefined}
+          accent={service.accent} rollKey={rollKey} rigRef={rigRef} reduceMotion={reduceMotion} frame={frame} theme={theme}
+          zoom={zoom} onZoom={onZoom} backdropRef={backdropRef} hotspots={hotspots} onReady={capture ? () => setReady(true) : undefined}
         />
       )}
       {gl === false && (
@@ -156,7 +156,7 @@ export function Showroom({
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-28 bg-gradient-to-b from-[color-mix(in_srgb,var(--shade)_70%,transparent)] to-transparent" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-24 bg-gradient-to-t from-[color-mix(in_srgb,var(--shade)_80%,transparent)] to-transparent" />
 
-      {hotspots && <HotspotLayer key={car.id} car={car} els={dotRefs} rig={rig} />}
+      {hotspots && <HotspotLayer key={car.id} car={car} els={dotRefs} rigRef={rigRef} />}
 
       {/* the loading ring stands on the platform while a model downloads */}
       {gl && loading !== null && viewSize.width > 0 && (

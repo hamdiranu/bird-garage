@@ -27,12 +27,23 @@ const YEAR = "public, max-age=31536000, immutable";
 /** For the other images and the texture transcoder: a week, then checked again (304 if unchanged). */
 const WEEK = "public, max-age=604800, stale-while-revalidate=86400";
 
+/** Sent with every response: no MIME sniffing, no full URLs leaked to other sites, no framing by other sites
+    (clickjacking), and no camera, microphone or location. WebXR stays allowed for "View in your space". */
+const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), xr-spatial-tracking=(self)" },
+];
+
 const nextConfig: NextConfig = {
   env: { ASSET_VERSIONS: JSON.stringify(assetVersions()) },
   async headers() {
-    // In development files change under the server, so they keep Next's default (always revalidate).
-    if (process.env.NODE_ENV !== "production") return [];
+    const security = { source: "/:path*", headers: SECURITY_HEADERS };
+    // In development files change under the server, so they keep Next's default caching (always revalidate).
+    if (process.env.NODE_ENV !== "production") return [security];
     return [
+      security,
       ...VERSIONED.map((dir) => ({ source: `/${dir}/:path*`, headers: [{ key: "Cache-Control", value: YEAR }] })),
       ...["/basis/:path*", "/icons/:path*", "/logos/:path*", "/previews/:path*", "/showroom.jpg", "/showroom-day.jpg"].map((source) => ({
         source,

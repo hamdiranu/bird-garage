@@ -24,9 +24,12 @@ const I18nContext = createContext<I18n | null>(null);
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
 
+  // The language can only be read once mounted (storage and the browser language don't exist on the server), and
+  // reading it during render would make the first client render differ from the prerendered HTML.
   useLayoutEffect(() => {
     const resolved = resolveLanguage();
     applyLanguage(resolved);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- adopting browser-only state after hydration
     setLangState(resolved);
   }, []);
 

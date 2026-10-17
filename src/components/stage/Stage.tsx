@@ -11,11 +11,11 @@ import { useTurntableInput } from "./useTurntableInput";
     Import it with next/dynamic and ssr: false, so three.js stays out of the page's first bundle.
     It draws on demand: only while something moves (see Scene), and not at all while scrolled out of view. */
 export default function Stage(props: StageProps) {
-  const { rig } = props;
-  const { ref, handlers } = useTurntableInput(rig, props.onZoom);
+  const { rigRef } = props;
+  const { ref, handlers } = useTurntableInput(rigRef, props.onZoom);
 
   useEffect(() => {
-    const el = ref.current;
+    const el = ref.current, rig = rigRef.current;
     if (!el) return;
     const io = new IntersectionObserver(([entry]) => {
       rig.offscreen = !entry.isIntersecting;
@@ -23,7 +23,7 @@ export default function Stage(props: StageProps) {
     });
     io.observe(el);
     return () => { io.disconnect(); rig.offscreen = false; };
-  }, [ref, rig]);
+  }, [ref, rigRef]);
 
   return (
     <div

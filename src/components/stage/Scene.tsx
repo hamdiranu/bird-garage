@@ -16,7 +16,7 @@ import type { Car } from "@/types/fleet";
 import { facing, hotspotNormal, hotspotPoint } from "./hotspots";
 import { LOOK, THEME_SECONDS, tweenColor } from "./lighting";
 import { withReflection, type DeckedCar } from "./reflection";
-import type { HotspotDots, Rig, StageProps } from "./types";
+import type { HotspotDots, RigRef, StageProps } from "./types";
 
 const YELLOW = new THREE.Color("#f5c518");
 /** Room left between two cars' turning circles in compare mode, metres. */
@@ -34,7 +34,7 @@ type Role = "car" | "pinned";
 
 /** Lights, the camera that frames the cars on the backdrop photo's platform, and one turntable per car: the
     current car, plus the pinned one to its left in compare mode. */
-export function Scene({ car, pinned, accent, rollKey, rig, reduceMotion, frame, theme, zoom, backdrop, hotspots, onReady }: StageProps) {
+export function Scene({ car, pinned, accent, rollKey, rigRef, reduceMotion, frame, theme, zoom, backdropRef, hotspots, onReady }: StageProps) {
   const { camera, size, gl, invalidate } = useThree();
   const hemi = useRef<THREE.HemisphereLight>(null);
   const key = useRef<THREE.DirectionalLight>(null);
@@ -49,10 +49,11 @@ export function Scene({ car, pinned, accent, rollKey, rig, reduceMotion, frame, 
   // drawing while anything moves. Every render of the scene (a new car, zoom, theme, size…) wakes it too.
   const awakeUntil = useRef(0);
   useEffect(() => {
+    const rig = rigRef.current;
     rig.wake = () => { awakeUntil.current = performance.now() + AWAKE_MS; invalidate(); };
     return () => { rig.wake = () => {}; };
-  }, [rig, invalidate]);
-  useEffect(() => rig.wake());
+  }, [rigRef, invalidate]);
+  useEffect(() => rigRef.current.wake());
 
   // Two cars stand side by side with their turning circles GAP apart, the pair centred on the platform.
   const spots = useMemo(() => {
@@ -123,12 +124,12 @@ export function Scene({ car, pinned, accent, rollKey, rig, reduceMotion, frame, 
     v.pyT = a.y - top * ppu * 0.45;
     // The first framing jumps straight to its targets (zoom included) instead of easing in from nowhere.
     if (v.first) { v.dist = v.distT; v.ox = v.oxT; v.oy = v.oyT; v.px = v.pxT; v.py = v.pyT; v.z = zoom; v.first = false; }
-  }, [pinned, halfWidth, depth, top, camera, size, frame]);
+  }, [pinned, halfWidth, depth, top, camera, size, frame, zoom]);
 
   // The camera moves first each frame (priority -1), so the turntables place their hotspot dots against it.
   useFrame((state, delta) => {
     const dt = Math.min(0.05, delta), v = view.current;
-    if (rig.spin && !rig.dragging && !rig.hold && performance.now() - rig.lastInput > 1600) rig.yaw += dt * 0.3;
+    if (rigRef.current.spin && !rigRef.current.dragging && !rigRef.current.hold && performance.now() - rigRef.current.lastInput > 1600) rigRef.current.yaw += dt * 0.3;
     const k = Math.min(1, dt * 5);
     v.dist += (v.distT - v.dist) * k;
     v.ox += (v.oxT - v.ox) * k;
@@ -148,7 +149,7 @@ export function Scene({ car, pinned, accent, rollKey, rig, reduceMotion, frame, 
     cam.setViewOffset(W, H, v.ox + v.px * (1 - 1 / zin), v.oy + v.py * (1 - 1 / zin), W / zin, H / zin);
     cam.updateMatrixWorld();
 
-    const bd = backdrop.current, last = photoScale.current;
+    const bd = backdropRef.current, last = photoScale.current;
     if (bd && (Math.abs(zin - last.s) > 1e-4 || (zin > 1.0001 && Math.hypot(v.px - last.x, v.py - last.y) > 0.25))) {
       bd.style.transformOrigin = `${v.px}px ${v.py}px`;
       bd.style.transform = zin > 1.0001 ? `scale(${zin})` : "";
@@ -159,9 +160,9 @@ export function Scene({ car, pinned, accent, rollKey, rig, reduceMotion, frame, 
     // turns, the pick flash, theme light fades) or the moment after a wake-up. Nothing at all while off screen.
     const easing = Math.abs(v.distT - v.dist) > SETTLED * v.dist || Math.abs(zoom - v.z) > SETTLED
       || Math.abs(v.oxT - v.ox) + Math.abs(v.oyT - v.oy) + Math.abs(v.pxT - v.px) + Math.abs(v.pyT - v.py) > 0.1;
-    const busy = (rig.spin && !rig.hold) || rig.dragging || easing || gsap.globalTimeline.getChildren(false, true, false).length > 0
+    const busy = (rigRef.current.spin && !rigRef.current.hold) || rigRef.current.dragging || easing || gsap.globalTimeline.getChildren(false, true, false).length > 0
       || performance.now() < awakeUntil.current;
-    if (busy && !rig.offscreen) state.invalidate();
+    if (busy && !rigRef.current.offscreen) state.invalidate();
   }, -1);
 
   return (
@@ -188,7 +189,7 @@ export function Scene({ car, pinned, accent, rollKey, rig, reduceMotion, frame, 
           car={s.car}
           x={s.x}
           rollKey={s.role === "car" ? rollKey : 0}
-          rig={rig}
+          rigRef={rigRef}
           pulse={s.role === "car"}
           reduceMotion={reduceMotion}
           decked={decked}
@@ -207,7 +208,7 @@ interface TurntableProps {
   x: number;
   /** Bumped when the car should roll in rather than appear in place. */
   rollKey: number;
-  rig: Rig;
+  rigRef: RigRef;
   /** The floor glow flashes yellow with the rig's pick pulse. */
   pulse: boolean;
   reduceMotion: boolean;
@@ -219,7 +220,7 @@ interface TurntableProps {
 
 /** One car on a spinning turntable, with a pool of its service colour and a soft shadow under it. The car rolls
     on when it changes; a scan shows once it has loaded. */
-function Turntable({ role, car, x, rollKey, rig, pulse, reduceMotion, decked, hotspots, onShown }: TurntableProps) {
+function Turntable({ role, car, x, rollKey, rigRef, pulse, reduceMotion, decked, hotspots, onShown }: TurntableProps) {
   const table = useRef<THREE.Group>(null);
   const slot = useRef<THREE.Group>(null);
   const glow = useRef<THREE.Mesh>(null);
@@ -256,7 +257,7 @@ function Turntable({ role, car, x, rollKey, rig, pulse, reduceMotion, decked, ho
       if (!live) return;
       s.clear();
       s.add(dc.group);
-      rig.wake();
+      rigRef.current.wake();
       const now = { id: car.id, dc, rolling: false };
       current.current = now;
       onShown(role, car.id, dc.height);
@@ -288,23 +289,7 @@ function Turntable({ role, car, x, rollKey, rig, pulse, reduceMotion, decked, ho
       loadCar(car).then((built) => show(deck(built))).catch((e) => console.error(`Couldn't load ${car.scan?.src}`, e));
     }
     return () => { live = false; roll?.kill(); if (current.current) current.current.rolling = false; };
-  }, [role, car, p, reach, rollKey, reduceMotion, decked, onShown, rig]);
-
-  useFrame((state, delta) => {
-    const t = table.current;
-    if (!t) return;
-    // slide to its spot (entering or leaving compare mode, or a new partner of another size)
-    t.position.x += (x - t.position.x) * Math.min(1, Math.min(0.05, delta) * 6);
-    if (Math.abs(x - t.position.x) > SETTLED && !rig.offscreen) state.invalidate();
-    t.rotation.y = rig.yaw;
-    if (glow.current) {
-      const m = glow.current.material as THREE.MeshBasicMaterial, pv = pulse ? rig.pulse : 0;
-      m.color.copy(accentColor.current).lerp(YELLOW, pv);
-      m.opacity = 0.45 + 0.4 * pv;
-      glow.current.scale.setScalar((glow.current.userData.s ?? 1) * (1 + 0.08 * pv));
-    }
-    if (hotspots) placeDots(state.camera, t);
-  });
+  }, [role, car, p, reach, rollKey, reduceMotion, decked, onShown, rigRef]);
 
   /** Keep each hotspot's button over its point on screen, faded by how squarely it faces the camera. Hidden while
       the car is still loading or rolling in. */
@@ -328,6 +313,22 @@ function Turntable({ role, car, x, rollKey, rig, pulse, reduceMotion, decked, ho
       el.dataset.hidden = String(face < 0.35);
     });
   }
+
+  useFrame((state, delta) => {
+    const t = table.current;
+    if (!t) return;
+    // slide to its spot (entering or leaving compare mode, or a new partner of another size)
+    t.position.x += (x - t.position.x) * Math.min(1, Math.min(0.05, delta) * 6);
+    if (Math.abs(x - t.position.x) > SETTLED && !rigRef.current.offscreen) state.invalidate();
+    t.rotation.y = rigRef.current.yaw;
+    if (glow.current) {
+      const m = glow.current.material as THREE.MeshBasicMaterial, pv = pulse ? rigRef.current.pulse : 0;
+      m.color.copy(accentColor.current).lerp(YELLOW, pv);
+      m.opacity = 0.45 + 0.4 * pv;
+      glow.current.scale.setScalar((glow.current.userData.s ?? 1) * (1 + 0.08 * pv));
+    }
+    if (hotspots) placeDots(state.camera, t);
+  });
 
   return (
     <group ref={table}>

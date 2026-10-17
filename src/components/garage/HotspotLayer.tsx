@@ -1,6 +1,7 @@
 import { useEffect, useState, type RefObject } from "react";
-import type { Rig } from "@/components/stage/types";
+import type { RigRef } from "@/components/stage/types";
 import { Icon } from "@/components/ui/Icon";
+import { useDismiss } from "@/hooks/useDismiss";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Car } from "@/types/fleet";
 
@@ -9,34 +10,23 @@ interface HotspotLayerProps {
   /** One element per hotspot; the stage's render loop moves each over its point on the car and fades it by
       --facing (see Scene.tsx). */
   els: RefObject<(HTMLElement | null)[]>;
-  rig: Rig;
+  rigRef: RigRef;
 }
 
 /** Tappable dots over the car's points of interest. Tapping one opens its note and holds the car still; a tap
     anywhere else, or Esc, closes it. The dots fade out round the far side of the car. */
-export function HotspotLayer({ car, els, rig }: HotspotLayerProps) {
+export function HotspotLayer({ car, els, rigRef }: HotspotLayerProps) {
   const { t, text } = useI18n();
   const [open, setOpen] = useState<number | null>(null);
 
   useEffect(() => {
+    const rig = rigRef.current;
     rig.hold = open !== null;
     rig.wake();
     return () => { rig.hold = false; rig.wake(); };
-  }, [open, rig]);
+  }, [open, rigRef]);
 
-  useEffect(() => {
-    if (open === null) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!els.current[open]?.contains(e.target as Node)) setOpen(null);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(null); };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, els]);
+  useDismiss(open !== null, () => (open === null ? null : els.current[open]), () => setOpen(null));
 
   const list = car.hotspots ?? [];
   return (

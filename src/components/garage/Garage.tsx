@@ -68,7 +68,7 @@ export default function Garage({ initialCar }: { initialCar?: string }) {
   const [reduceMotion, setReduceMotion] = useState(false);
   const isLg = useMediaQuery("(min-width: 1024px)");
 
-  const rig = useRef<Rig>({ yaw: -0.95, spin: true, dragging: false, hold: false, lastInput: -1e9, pulse: 0, wake: () => {}, offscreen: false }).current;
+  const rigRef = useRef<Rig>({ yaw: -0.95, spin: true, dragging: false, hold: false, lastInput: -1e9, pulse: 0, wake: () => {}, offscreen: false });
   const mainRef = useRef<HTMLElement>(null);
   const infoRef = useRef<HTMLElement>(null);
   const ratingsRef = useRef<HTMLElement>(null);
@@ -96,15 +96,19 @@ export default function Garage({ initialCar }: { initialCar?: string }) {
   useLayoutEffect(() => {
     const initial = resolveTheme();
     applyTheme(initial);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- adopting browser-only state after hydration
     setTheme(initial);
   }, []);
 
   // Restore the last visit, then let the page's car (/car/<id>) or a /#car-id link override the car. Auto-spin stays
   // off if it was turned off, or if the visitor prefers reduced motion. A ?showroom link switches showroom mode on,
   // for kiosk screens (?showroom=20 starts the tour after 20 idle seconds instead of 60).
+  // All of this is browser-only (storage, the URL, media queries), so it's read once mounted: reading it during
+  // render would make the first client render differ from the prerendered HTML.
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const params = new URLSearchParams(location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- adopting browser-only state after hydration
     setReduceMotion(reduce);
     const saved = loadGarage();
     if (saved.pick) setPick(saved.pick);
@@ -198,7 +202,7 @@ export default function Garage({ initialCar }: { initialCar?: string }) {
 
   const togglePick = () => {
     const next = picked ? null : car.id;
-    if (next) { gsap.fromTo(rig, { pulse: 1 }, { pulse: 0, duration: 0.65, ease: "power2.out" }); rig.wake(); }
+    if (next) { gsap.fromTo(rigRef.current, { pulse: 1 }, { pulse: 0, duration: 0.65, ease: "power2.out" }); rigRef.current.wake(); }
     setPick(next);
   };
 
@@ -212,8 +216,8 @@ export default function Garage({ initialCar }: { initialCar?: string }) {
   /** Turn to a preset view the short way round (stops auto-spin). */
   const aim = (view: ViewKey) => {
     setSpin(false);
-    gsap.to(rig, { yaw: rig.yaw + shortestTurn(rig.yaw, VIEWS[view]), duration: reduceMotion ? 0 : 0.8, ease: "power3.inOut", overwrite: "auto" });
-    rig.wake();
+    gsap.to(rigRef.current, { yaw: rigRef.current.yaw + shortestTurn(rigRef.current.yaw, VIEWS[view]), duration: reduceMotion ? 0 : 0.8, ease: "power3.inOut", overwrite: "auto" });
+    rigRef.current.wake();
   };
 
   const viewInSpace = () => {
@@ -233,10 +237,10 @@ export default function Garage({ initialCar }: { initialCar?: string }) {
   // Showroom mode tours the cars in the current filter, spinning each one even with auto-spin off.
   const touring = useShowroomTour(showroom && !capture, () => step(1), tourIdleMs);
   useEffect(() => {
-    rig.spin = spin || touring;
-    rig.lastInput = -1e9;
-    rig.wake();
-  }, [spin, touring, rig]);
+    rigRef.current.spin = spin || touring;
+    rigRef.current.lastInput = -1e9;
+    rigRef.current.wake();
+  }, [spin, touring, rigRef]);
 
   useKeyboardShortcuts({
     prev: () => step(-1),
@@ -304,7 +308,7 @@ export default function Garage({ initialCar }: { initialCar?: string }) {
           pinned={pinnedCar}
           theme={theme}
           gl={gl}
-          rig={rig}
+          rigRef={rigRef}
           rollKey={rollKey}
           zoom={zoom}
           onZoom={zoomBy}

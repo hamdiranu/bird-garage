@@ -5,7 +5,8 @@ import type { Car, Hotspot } from "@/types/fleet";
 /* Types shared by the 3D stage and the page around it. They live apart from Stage.tsx so the page can use them
    without pulling the 3D code into its bundle. */
 
-/** Mutable turntable state shared between the page and the render loop. */
+/** Mutable turntable state shared between the page and the render loop. It lives in a ref (RigRef): the page,
+    pointer handlers and render loop all write to it directly, outside React rendering. */
 export interface Rig {
   /** Turntable angle in radians. */
   yaw: number;
@@ -25,6 +26,8 @@ export interface Rig {
   /** The stage is scrolled out of view, so it stops drawing (even while spinning). */
   offscreen: boolean;
 }
+
+export type RigRef = RefObject<Rig>;
 
 /** Pixels of the canvas covered by page UI on each edge; the car is framed clear of them. */
 export interface Frame {
@@ -54,7 +57,7 @@ export interface StageProps {
   accent: string;
   /** Bumped when the car should roll in rather than appear in place. */
   rollKey: number;
-  rig: Rig;
+  rigRef: RigRef;
   reduceMotion: boolean;
   frame: Frame;
   theme: Theme;
@@ -63,7 +66,7 @@ export interface StageProps {
   /** Ask the page to multiply the zoom (wheel and pinch on the stage). */
   onZoom: (factor: number) => void;
   /** The backdrop photo's layer, scaled with the zoom so the car stays standing on its platform. */
-  backdrop: RefObject<HTMLDivElement | null>;
+  backdropRef: RefObject<HTMLDivElement | null>;
   /** Hotspots to track on the current car, or null to show none. */
   hotspots: HotspotDots | null;
   /** Called whenever every car on the stage is showing (the preview capture waits for it). */

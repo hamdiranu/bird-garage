@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { useDismiss } from "@/hooks/useDismiss";
 import { useI18n } from "@/i18n/I18nProvider";
 import { LanguageToggle } from "./LanguageToggle";
 
@@ -28,17 +29,7 @@ export function HeaderMenu({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismiss(open, () => ref.current, () => setOpen(false));
 
   const keys = t.menu.keys;
   return (

@@ -1,9 +1,9 @@
 import { useEffect, useRef, type PointerEvent } from "react";
 import gsap from "gsap";
-import type { Rig } from "./types";
+import type { RigRef } from "./types";
 
 /** Drag sideways to turn the car, pinch or scroll to zoom. Returns the element ref and its pointer handlers. */
-export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
+export function useTurntableInput(rigRef: RigRef, onZoom: (factor: number) => void) {
   const ref = useRef<HTMLDivElement>(null);
   const lastX = useRef(0);
   /** Fingers/pointers currently down on the stage, for pinch. */
@@ -11,7 +11,7 @@ export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
   /** Finger spread at the last pinch step; 0 when not pinching. */
   const pinch = useRef(0);
   const zoom = useRef(onZoom);
-  zoom.current = onZoom;
+  useEffect(() => { zoom.current = onZoom; });
 
   // Wheel zooms. React's wheel listener is passive (can't stop the page scrolling), so attach our own.
   useEffect(() => {
@@ -36,10 +36,10 @@ export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
     if (pointers.current.size < 2) pinch.current = 0;
     const [rest] = [...pointers.current.values()];
     if (rest) { lastX.current = rest.x; return; } // one finger left after a pinch: carry on turning
-    rig.dragging = false;
+    rigRef.current.dragging = false;
     ref.current?.removeAttribute("data-drag");
-    rig.lastInput = performance.now();
-    rig.wake();
+    rigRef.current.lastInput = performance.now();
+    rigRef.current.wake();
   };
 
   const handlers = {
@@ -47,8 +47,8 @@ export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
       if (pointers.current.size === 2) { pinch.current = spread(); return; }
-      rig.dragging = true;
-      gsap.killTweensOf(rig, "yaw");
+      rigRef.current.dragging = true;
+      gsap.killTweensOf(rigRef.current, "yaw");
       ref.current?.setAttribute("data-drag", "true");
       lastX.current = e.clientX;
     },
@@ -63,12 +63,12 @@ export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
         pinch.current = d;
         return;
       }
-      if (!rig.dragging) return;
+      if (!rigRef.current.dragging) return;
       // Turn only: the camera's height is fixed to match the photo behind.
-      rig.yaw += (e.clientX - lastX.current) * 0.009;
+      rigRef.current.yaw += (e.clientX - lastX.current) * 0.009;
       lastX.current = e.clientX;
-      rig.lastInput = performance.now();
-      rig.wake();
+      rigRef.current.lastInput = performance.now();
+      rigRef.current.wake();
     },
     onPointerUp: (e: PointerEvent<HTMLDivElement>) => release(e.pointerId),
     onPointerCancel: (e: PointerEvent<HTMLDivElement>) => release(e.pointerId),

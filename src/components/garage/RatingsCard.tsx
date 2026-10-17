@@ -1,12 +1,12 @@
-import { useRef, type RefObject } from "react";
+import { useRef, useState, type RefObject } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Icon, StarFill, type IconName } from "@/components/ui/Icon";
 import { useI18n } from "@/i18n/I18nProvider";
 import { RATING_KEYS, overallRating } from "@/lib/fleet";
-import type { Car, RatingKey } from "@/types/fleet";
+import type { Car } from "@/types/fleet";
+import { RATING_ICON } from "./ratingIcons";
 
-const RATING_ICON: Record<RatingKey, IconName> = { capacity: "seat", comfort: "sofa", eco: "leaf", agility: "city" };
 
 interface RatingsCardProps {
   /** The card's element; the page measures it and slides it away for focus view. */
@@ -29,7 +29,7 @@ export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onCha
   const scoreRef = useRef<HTMLSpanElement>(null);
   const shown = useRef({ value: overall });
   /** Rendered as the score's text at first; afterwards GSAP writes it while counting. */
-  const firstScore = useRef(number(overall, { min: 1 })).current;
+  const [firstScore] = useState(() => number(overall, { min: 1 }));
 
   // The overall score counts to its new value (and is rewritten in the new format when the language changes).
   useGSAP(() => {

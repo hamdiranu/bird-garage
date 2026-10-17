@@ -1,6 +1,6 @@
 import type { Car } from "@/types/fleet";
 
-/* A car's side profile drawn flat on a canvas: the roster placeholder until the 3D thumbnails are ready, and the
+/* A car's side profile drawn flat on a canvas: the picture for a car without a pre-rendered thumbnail, and the
    stage itself when the browser has no WebGL. */
 
 type Point = [number, number];

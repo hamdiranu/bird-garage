@@ -5,7 +5,10 @@
 export type ARMode = "quicklook" | "webxr";
 
 export async function detectAR(): Promise<ARMode | null> {
-  if (document.createElement("a").relList?.supports?.("ar")) return "quicklook";
+  try {
+    // Safari says yes; Chrome says no; Firefox throws, since links have no defined rel tokens to check against.
+    if (document.createElement("a").relList?.supports?.("ar")) return "quicklook";
+  } catch {}
   try {
     if (await navigator.xr?.isSessionSupported("immersive-ar")) return "webxr";
   } catch {}

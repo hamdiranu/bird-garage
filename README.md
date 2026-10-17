@@ -18,6 +18,7 @@ Built with **Next.js 16**, **React 19**, **React Three Fiber**, **Drei**, **Thre
 - [Project structure](#project-structure)
 - [How it works](#how-it-works)
 - [Adding and changing content](#adding-and-changing-content)
+- [Testing and linting](#testing-and-linting)
 - [Browser support](#browser-support)
 - [Known limitations](#known-limitations)
 - [Credits](#credits)
@@ -65,12 +66,16 @@ Open <http://localhost:3000>.
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
 | `npm run typecheck` | TypeScript check with no output |
+| `npm test` | Unit tests, once (`npm run test:watch` to re-run on changes) |
+| `npm run lint` | ESLint with Next's Core Web Vitals and TypeScript rules |
 | `npm run finish-scan -- <file.glb> …` | Strip unused maps and normals from scans and compress their textures to KTX2 (see "Add a scanned car") |
 | `npm run capture [-- <car-id> …]` | Render each car's link preview and roster thumbnail from the running site (see "Update the car pictures") |
 
 The pages are prerendered as static HTML: the home page and one `/car/<id>` page per car. Images go through `next/image`, so host it on something that runs Next.js (for example `next start` or Vercel).
 
 **Caching.** In production, car models and thumbnails are served with `Cache-Control: public, max-age=31536000, immutable` and requested with a hash of their content (`?v=…`), worked out in `next.config.ts` when the site builds, so a replaced file gets a new URL. The other images and the texture transcoder are cached for a week. On a host that doesn't run `next start` or Vercel, set the same headers there.
+
+**Security headers.** Every response also carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY` and a `Permissions-Policy` that turns off the camera, microphone and location (WebXR stays allowed, for AR). They're set in `next.config.ts`.
 
 Link previews need the site's public address for their image URLs. Vercel provides it; anywhere else, set `SITE_URL` (for example `SITE_URL=https://garage.example.com`) when building. Without it the build warns and falls back to `http://localhost:3000`.
 
@@ -182,6 +187,7 @@ src/
       InfoCard.tsx        left card: service, maker, model, share button, blurb, specs, maker emblem
       RatingsCard.tsx     right card: overall score, rating bars, select button
       CompareCards.tsx    the two cards of compare mode: specs side by side, ratings head to head
+      ratingIcons.ts      the icon for each rating, shared by both ratings cards
       Roster.tsx          car strip along the bottom
       Timeline.tsx        the fleet timeline sheet
       view.ts             camera presets and zoom limits
@@ -202,7 +208,7 @@ src/
     services.ts           services (name, role, accent, badge) and the filter order
     makers.ts             maker emblems
     timeline.ts           the fleet timeline's milestones
-  hooks/                  reusable hooks: useMediaQuery, useElementSize, useFitText
+  hooks/                  reusable hooks: useMediaQuery, useElementSize, useFitText, useDismiss (Esc / click outside)
   i18n/                   translations
     messages.ts           every interface string, in English and Indonesian
     I18nProvider.tsx      current language, useI18n() for t (strings), text() (data text) and number()
@@ -229,6 +235,7 @@ src/
     arSupport.ts          whether and how the device can do AR (no three.js)
     ar.ts                 "View in your space": USDZ for AR Quick Look, or a WebXR session
     dom.ts, format.ts     small browser and formatting helpers
+  testing/                helpers for the tests: rendering inside the language provider, a fake 2D canvas
   types/
     fleet.ts              Car, Service, profile, scan, hotspot and timeline types, documented field by field
     i18n.ts               Lang, and Text (one string, or one per language)
@@ -434,6 +441,19 @@ Both photos must be **framed identically** (same platform position). If you swap
 Edit the token values in `src/app/globals.css`: the dark set under `:root`, the light set under `:root[data-theme="light"]`. To add a token, also add an `@property` rule for it and list it in `transition-property`; otherwise it switches instantly instead of fading.
 
 ---
+
+## Testing and linting
+
+Unit tests use [Vitest](https://vitest.dev/) with React Testing Library in jsdom (`vitest.config.mts`, `vitest.setup.ts`). Each test sits in a `__tests__` folder beside the file it covers: `src/lib/__tests__/fleet.test.ts` tests `src/lib/fleet.ts`. (Inside `src/app`, Next ignores folders that start with an underscore, so they're never routed.)
+
+- **Logic.** Sorting and filtering, outlines, the side-view drawing, saved state, language and theme (including the inline `<head>` script), sharing and its copy fallbacks, content-hashed asset URLs, link-preview metadata, AR detection, hotspot geometry, camera presets, load progress and the renderer hand-over.
+- **Data.** Every car has a unique, URL-safe id, valid ratings, its scan in its service's folder, a thumbnail and a link preview, and hotspots that sit on the car and match it (no roof-sign dot without a sign). Timeline cars exist, years run in order, and every logo and badge file is there. The English and Indonesian message tables have exactly the same keys.
+- **Components and hooks.** The menus, sort list, toolbar, filters, roster, cards, compare cards, hotspot notes, timeline dialog and thumbnails; keyboard shortcuts, showroom tour timing, preloading and media queries.
+- **The page.** `Garage.test.tsx` drives the whole screen: changing car, filtering, sorting, picking, compare mode and the timeline.
+
+The 3D stage itself (WebGL, the GLB loader, the AR session) doesn't run in jsdom. It's checked in a real browser instead.
+
+ESLint (`eslint.config.mjs`) uses `eslint-config-next`, including the React Hooks rules that the React Compiler relies on. Mutable state shared with the render loop, such as the turntable `rigRef`, lives in refs, which those rules expect.
 
 ## Browser support
 

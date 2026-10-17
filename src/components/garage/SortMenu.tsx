@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { useDismiss } from "@/hooks/useDismiss";
 import { useI18n } from "@/i18n/I18nProvider";
 import { SORT_KEYS } from "@/lib/fleet";
 import type { SortKey } from "@/types/fleet";
@@ -11,17 +12,7 @@ export function SortMenu({ sort, onChange }: { sort: SortKey; onChange: (sort: S
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismiss(open, () => ref.current, () => setOpen(false));
 
   const sorted = sort !== "fleet";
   return (
