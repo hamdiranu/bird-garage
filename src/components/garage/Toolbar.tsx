@@ -7,16 +7,22 @@ const VIEW_ICON: Record<ViewKey, IconName> = { front: "front", side: "car", rear
 export interface ToolbarProps {
   spin: boolean;
   zoom: number;
+  comparing: boolean;
+  /** "View in your space" is offered only where the device can do AR. */
+  canAR: boolean;
   onAim: (view: ViewKey) => void;
   onSpin: () => void;
+  onCompare: () => void;
+  onAR: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
   className?: string;
 }
 
-/** Camera presets, auto-spin and zoom in one pill. Labels show only where the stage is wide enough. */
-export function Toolbar({ spin, zoom, onAim, onSpin, onZoomIn, onZoomOut, onZoomReset, className }: ToolbarProps) {
+/** Camera presets, auto-spin, compare, AR (on phones that can) and zoom in one pill. Labels show only where the
+    stage is wide enough. */
+export function Toolbar({ spin, zoom, comparing, canAR, onAim, onSpin, onCompare, onAR, onZoomIn, onZoomOut, onZoomReset, className }: ToolbarProps) {
   const { t } = useI18n();
   const sep = <span aria-hidden="true" className="h-5 w-px bg-edge" />;
   const zoomBtn = "grid h-9 w-9 place-items-center rounded-full text-soft transition-colors hover:text-ink disabled:opacity-35 disabled:hover:text-soft md:h-10 md:w-10";
@@ -31,6 +37,14 @@ export function Toolbar({ spin, zoom, onAim, onSpin, onZoomIn, onZoomOut, onZoom
       ))}
       <ToolButton icon="spin" label={t.toolbar.spin} pressed={spin} onClick={onSpin} />
       {sep}
+      <ToolButton icon="compare" label={t.toolbar.compare} title={t.toolbar.compareTitle} pressed={comparing} onClick={onCompare} />
+      {sep}
+      {canAR && (
+        <>
+          <ToolButton icon="cube" label={t.toolbar.ar} short={t.toolbar.arShort} onClick={onAR} />
+          {sep}
+        </>
+      )}
       <span role="group" aria-label={t.toolbar.zoom} className="flex items-center">
         <button onClick={onZoomOut} disabled={zoom <= ZOOM.min + 1e-3} aria-label={t.toolbar.zoomOut} title={t.toolbar.zoomOutTitle} className={zoomBtn}>
           <Icon name="zoomOut" className="h-[18px] w-[18px]" />
@@ -51,16 +65,21 @@ export function Toolbar({ spin, zoom, onAim, onSpin, onZoomIn, onZoomOut, onZoom
   );
 }
 
-function ToolButton({ icon, label, pressed, onClick }: { icon: IconName; label: string; pressed?: boolean; onClick: () => void }) {
+/** An icon button whose label shows beside the icon on wide screens; `short` shows on narrow ones instead of
+    nothing. */
+function ToolButton({ icon, label, short, title, pressed, onClick }: {
+  icon: IconName; label: string; short?: string; title?: string; pressed?: boolean; onClick: () => void;
+}) {
   return (
     <button
       aria-pressed={pressed}
       onClick={onClick}
       aria-label={label}
-      title={label}
+      title={title ?? label}
       className={`flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[11px] font-semibold uppercase leading-none tracking-[.1em] transition-[background,color,border-color,box-shadow] md:h-10 xl:px-4 xl:text-xs ${pressed ? "brand-fill" : "border-transparent text-soft hover:text-ink"}`}
     >
       <Icon name={icon} className="h-[18px] w-[18px]" />
+      {short && <span className="xl:hidden">{short}</span>}
       <span className="hidden xl:inline">{label}</span>
     </button>
   );

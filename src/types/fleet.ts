@@ -20,6 +20,36 @@ export interface Service {
 /** This site's 0–10 ratings, shown as bars on the ratings card. */
 export type RatingKey = "capacity" | "comfort" | "eco" | "agility";
 
+/** What drives the car (its label is in i18n/messages.ts). */
+export type Power = "electric" | "petrol" | "diesel";
+
+/** Orders for the roster: as listed in data/cars.ts, best overall rating, most seats, or electric cars first. */
+export type SortKey = "fleet" | "rating" | "seats" | "electric";
+
+/** What a hotspot points out; each kind has a title and a default note in i18n/messages.ts. */
+export type HotspotKind = "sign" | "plate" | "charge" | "doors" | "livery";
+
+/** A tappable dot on the 3D car with a short note. */
+export interface Hotspot {
+  kind: HotspotKind;
+  /** Where the dot sits on the car: along it from the front bumper (0) to the rear (1); up from the ground as a
+      share of the roof height (above 1 for a roof sign or open doors); across from the car's left side (-1) to its
+      right (1), as seen from the driver's seat. */
+  at: [along: number, up: number, across: number];
+  /** This car's note, in place of the kind's default one. */
+  note?: Text;
+}
+
+/** A point on the fleet timeline, optionally showing one of the cars. */
+export interface Milestone {
+  /** As printed on the timeline, e.g. "1972" or "2000s". */
+  year: string;
+  /** Id of the car it shows, if any. */
+  car?: string;
+  title: Text;
+  note: Text;
+}
+
 /** Side-profile measurements in metres, x from the front bumper. They shape the sketched 3D model and the 2D
     drawing; a scanned car uses only the size (L, W, H) to scale its scan. */
 export interface ProfileParams {
@@ -84,11 +114,12 @@ export interface CarEntry {
   blurb: Text;
   body: Text;
   seats: Text;
-  power: Text;
+  power: Power;
   /** The car's place in the fleet, shown under the maker's emblem. */
   note: Text;
   ratings: Record<RatingKey, number>;
   scan?: Scan;
+  hotspots?: Hotspot[];
   profile: Partial<ProfileParams>;
 }
 

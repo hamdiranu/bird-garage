@@ -1,18 +1,30 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Car } from "@/types/fleet";
+import { provideRenderer } from "./gpu";
 import { loadCar } from "./loadCar";
 
-/* Renders a front three-quarter picture of every car for the roster with one off-screen renderer, then frees
-   the GL context. */
+/* Renders a front three-quarter picture of each car with one off-screen renderer, then frees the GL context.
+   The capture page (app/capture/thumbs) uses it to make the pre-rendered thumbnails in public/thumbs. */
 
-/** PNG data URLs keyed by car id. A car whose model fails to load is left out (the roster keeps its 2D drawing). */
-export async function renderThumbnails(cars: Car[], w = 260, h = 130): Promise<Record<string, string>> {
+export interface ThumbnailOptions {
+  /** Called with each picture as soon as it's rendered. */
+  onEach?: (id: string, url: string) => void;
+  width?: number;
+  height?: number;
+  /** Image type for the data URLs, e.g. "image/webp", and its quality (0–1). */
+  type?: string;
+  quality?: number;
+}
+
+/** Data URLs keyed by car id, on a transparent background. A car whose model fails to load is left out. */
+export async function renderThumbnails(cars: Car[], { onEach, width: w = 260, height: h = 130, type = "image/png", quality }: ThumbnailOptions = {}): Promise<Record<string, string>> {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   // The stage compiles the same car materials with shader checks on, so this renderer skips them. That saves a
   // few blocking GL queries per shader and quiets the rounding notes Windows' Direct3D compiler leaves on three's
   // environment-map shaders (logged as "Program Info Log" warnings, though the shaders link and run fine).
   renderer.debug.checkShaderErrors = false;
+  provideRenderer(renderer);
   renderer.setPixelRatio(1);
   renderer.setSize(w, h, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -35,6 +47,7 @@ export async function renderThumbnails(cars: Car[], w = 260, h = 130): Promise<R
   for (const car of cars) {
     let obj: THREE.Object3D;
     try {
+      // shared with the stage's cache, so this also fetches the models ahead of the visitor
       obj = (await loadCar(car)).root.clone(true);
     } catch {
       continue;
@@ -66,7 +79,8 @@ export async function renderThumbnails(cars: Car[], w = 260, h = 130): Promise<R
     }
     place(dist);
     renderer.render(scene, camera);
-    out[car.id] = renderer.domElement.toDataURL("image/png");
+    out[car.id] = renderer.domElement.toDataURL(type, quality);
+    onEach?.(car.id, out[car.id]);
     scene.remove(obj);
     // Let the page breathe between cars.
     await new Promise((r) => setTimeout(r, 0));

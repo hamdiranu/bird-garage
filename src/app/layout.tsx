@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Chakra_Petch } from "next/font/google";
 import "./globals.css";
 import { InlineScript } from "@/components/ui/InlineScript";
+import { CARS } from "@/lib/fleet";
+import { carMetadata, siteUrl } from "@/lib/previews";
 import { themeScript } from "@/lib/theme";
 
 const barlow = Barlow_Condensed({
@@ -16,9 +18,10 @@ const chakra = Chakra_Petch({
   variable: "--font-chakra",
 });
 
+// The home page shares with the first car's preview picture.
 export const metadata: Metadata = {
-  title: "Bird Garage · Bluebird Group",
-  description: "Car-select screen for the Bluebird Group fleet, in 3D. Unofficial.",
+  metadataBase: siteUrl,
+  ...carMetadata(CARS[0], "/", { title: "Bird Garage · Bluebird Group", description: "Car-select screen for the Bluebird Group fleet, in 3D. Unofficial." }),
   authors: [{ name: "Hamdi Ranuharja" }],
   creator: "Hamdi Ranuharja",
 };

@@ -14,11 +14,16 @@ interface HeaderMenuProps {
   onToggleSpin: () => void;
   showroom: boolean;
   onToggleShowroom: () => void;
+  hotspots: boolean;
+  onToggleHotspots: () => void;
+  onOpenTimeline: () => void;
 }
 
-/** The ☰ button and its panel: display switches, language and the keyboard shortcuts. Closes on a click
-    outside or Esc. */
-export function HeaderMenu({ light, onToggleTheme, focus, canFocus, onToggleFocus, spin, onToggleSpin, showroom, onToggleShowroom }: HeaderMenuProps) {
+/** The ☰ button and its panel: display switches, language, the fleet timeline and the keyboard shortcuts. Closes
+    on a click outside or Esc. */
+export function HeaderMenu({
+  light, onToggleTheme, focus, canFocus, onToggleFocus, spin, onToggleSpin, showroom, onToggleShowroom, hotspots, onToggleHotspots, onOpenTimeline,
+}: HeaderMenuProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +52,7 @@ export function HeaderMenu({ light, onToggleTheme, focus, canFocus, onToggleFocu
         <Icon name={open ? "x" : "menu"} className="h-6 w-6" />
       </button>
       {open && (
-        <div className="glass absolute right-0 top-[calc(100%+10px)] z-40 w-72 rounded-2xl p-2">
+        <div className="menu-panel absolute right-0 top-[calc(100%+10px)] z-40 w-72 rounded-2xl p-2">
           <div className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
             <span className="flex items-center gap-2.5"><Icon name="globe" className="h-[18px] w-[18px] text-(--icon)" /> {t.language.label}</span>
             <LanguageToggle compact className="flex" />
@@ -57,13 +62,22 @@ export function HeaderMenu({ light, onToggleTheme, focus, canFocus, onToggleFocu
             <MenuSwitch icon="expand" label={t.menu.focusView} on={focus} onClick={() => { onToggleFocus(); setOpen(false); }} />
           )}
           <MenuSwitch icon="spin" label={t.menu.autoSpin} on={spin} onClick={onToggleSpin} />
+          <MenuSwitch icon="spot" label={t.menu.hotspots} note={t.menu.hotspotsNote} on={hotspots} onClick={onToggleHotspots} />
           <MenuSwitch icon="play" label={t.menu.showroom} note={t.menu.showroomNote} on={showroom} onClick={onToggleShowroom} />
+          <button
+            onClick={() => { onOpenTimeline(); setOpen(false); }}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(47,139,255,.12)]"
+          >
+            <Icon name="history" className="h-[18px] w-[18px] flex-none text-(--icon)" /> {t.menu.timeline}
+          </button>
           <div className="mx-3 my-2 border-t border-edge" />
           <div className="px-3 pb-1 text-xs text-dim">
             <p className="mb-2 flex items-center gap-2 font-semibold uppercase tracking-[.14em]"><Icon name="keyboard" className="h-4 w-4" /> {t.menu.shortcuts}</p>
             <ul className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
               <Shortcut keys="← →">{keys.changeCar}</Shortcut>
               <Shortcut keys="Enter">{keys.selectCar}</Shortcut>
+              <Shortcut keys="C">{keys.compare}</Shortcut>
+              <Shortcut keys="H">{keys.hotspots}</Shortcut>
               {canFocus && <Shortcut keys="F">{keys.focusView}</Shortcut>}
               <Shortcut keys="+ / −">{keys.zoom}</Shortcut>
               <Shortcut keys="0">{keys.fit}</Shortcut>

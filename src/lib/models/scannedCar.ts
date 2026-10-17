@@ -1,8 +1,12 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+import { assetUrl } from "@/lib/assets";
 import type { Car } from "@/types/fleet";
+import { firstRenderer } from "./gpu";
 import { paintedLivery } from "./livery";
+import { setLoadProgress } from "./progress";
 import type { BuiltCar } from "./types";
 
 /* Cars from scanned GLB models. Each scan is turned to face +x and scaled to the car's real size. A textured
@@ -12,16 +16,32 @@ import type { BuiltCar } from "./types";
 /** Tripo exports put the nose at +z; a quarter turn points it down +x like the rest of the app. */
 const DEFAULT_YAW = Math.PI / 2;
 
+/** three's Basis transcoder (basis_transcoder.js and .wasm), copied into public/. */
+const TRANSCODER_PATH = "/basis/";
+
+/** One loader for every scan, made once a renderer can say which compressed texture formats its GPU reads. The
+    files use Meshopt geometry and KTX2 textures (see scripts/finish-scan.mjs), so it gets both decoders. */
+const gltfLoader = firstRenderer.then((renderer) =>
+  new GLTFLoader()
+    .setMeshoptDecoder(MeshoptDecoder)
+    .setKTX2Loader(new KTX2Loader().setTranscoderPath(TRANSCODER_PATH).detectSupport(renderer)),
+);
+
 const loads = new Map<string, Promise<BuiltCar>>();
 
+/** Load (once) and build a car's scan. Its download progress is published for the stage's loading ring, and a
+    failed load is forgotten so the next request tries again. */
 export function loadScannedCar(car: Car): Promise<BuiltCar> {
   const scan = car.scan;
   if (!scan) return Promise.reject(new Error(`${car.id} has no scan`));
   let load = loads.get(car.id);
   if (!load) {
-    // Models are shrunk with glTF-Transform (Meshopt geometry, WebP textures), so the loader needs the decoder.
-    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    load = loader.loadAsync(scan.src).then((gltf) => build(car, gltf.scene));
+    setLoadProgress(car.id, 0);
+    load = gltfLoader
+      .then((loader) => loader.loadAsync(assetUrl(scan.src), (e) => setLoadProgress(car.id, e.lengthComputable && e.total ? Math.min(1, e.loaded / e.total) : NaN)))
+      .then((gltf) => build(car, gltf.scene))
+      .catch((err) => { loads.delete(car.id); throw err; })
+      .finally(() => setLoadProgress(car.id, null));
     loads.set(car.id, load);
   }
   return load;
@@ -44,7 +64,8 @@ function build(car: Car, scene: THREE.Object3D): BuiltCar {
   let src: THREE.Mesh | undefined;
   scene.traverse((n) => { if (!src && n instanceof THREE.Mesh) src = n; });
   if (!src) throw new Error(`${scan.src}: no mesh`);
-  const srcMat = src.material as THREE.MeshStandardMaterial;
+  // Stripped scans are marked unlit (KHR_materials_unlit), which the loader reads as a basic material.
+  const srcMat = src.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
   const textured = !!srcMat.map;
   const geo = src.geometry.clone();
   toFloat(geo);
@@ -85,7 +106,7 @@ function build(car: Car, scene: THREE.Object3D): BuiltCar {
 
 /** The scan's own colours with no shading: the stage's lights, reflections and accent rim don't touch it, and
     tone mapping is off so the texture's colours reach the screen unchanged (the same in both themes). */
-function unlit(src: THREE.MeshStandardMaterial) {
+function unlit(src: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial) {
   return new THREE.MeshBasicMaterial({
     map: src.map,
     color: src.color,

@@ -42,7 +42,7 @@ export function RatingsCard({ cardRef, car, picked, hasPick, onTogglePick, onCha
   return (
     <section
       ref={cardRef}
-      className="glass relative z-10 col-span-2 row-start-3 flex min-w-0 flex-col rounded-2xl p-4 [--gap:clamp(12px,2.2vh,24px)] md:row-start-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,300px)] md:gap-x-8 md:p-5 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:flex lg:p-4 xl:p-5 2xl:p-6"
+      className="glass relative z-10 m-3 flex max-md:order-5 md:m-0 min-w-0 flex-col rounded-2xl p-4 [--gap:clamp(12px,2.2vh,24px)] md:col-span-2 md:row-start-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,300px)] md:gap-x-8 md:p-5 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:flex lg:p-4 xl:p-5 2xl:p-6"
     >
       <div className="lg:flex lg:flex-1 lg:flex-col">
         {/* overall score: a gold-ringed star, the number and five stars */}

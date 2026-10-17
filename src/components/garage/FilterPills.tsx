@@ -37,7 +37,7 @@ export function FilterPills({ filter, onChange, reduceMotion }: { filter: Filter
       ref={ref}
       role="group"
       aria-label={t.filter.label}
-      className="no-scrollbar relative col-span-2 -mx-gut flex min-w-0 gap-1 overflow-x-auto px-gut pb-2.5 md:mx-0 md:flex-1 md:justify-center-safe md:px-0 md:py-2.5 2xl:gap-1.5"
+      className="no-scrollbar relative -ml-gut flex min-w-0 flex-1 gap-1 overflow-x-auto pl-gut md:ml-0 md:justify-center-safe md:pl-0 2xl:gap-1.5"
       style={{
         maskImage: `linear-gradient(90deg, ${hidden.l ? "transparent" : "#000"}, #000 28px, #000 calc(100% - 28px), ${hidden.r ? "transparent" : "#000"})`,
       }}

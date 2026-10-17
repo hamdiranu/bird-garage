@@ -41,6 +41,7 @@
 @property --card-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --card-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --card-hi { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --menu { syntax: "<color>"; inherits: true; initial-value: #0b1834; }
 @property --drop { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --tile { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --icon { syntax: "<color>"; inherits: true; initial-value: #8cc4ff; }
@@ -80,6 +81,7 @@
   --card-a: rgba(17, 34, 70, 0.66);
   --card-b: rgba(8, 17, 38, 0.72);
   --card-hi: rgba(160, 200, 255, 0.08);
+  --menu: #0b1834;
   --drop: rgba(0, 0, 0, 0.7);
   --tile: rgba(10, 22, 48, 0.45);
   --icon: #8cc4ff;
@@ -101,7 +103,7 @@
 
   transition-property:
     --night, --line, --edge, --ink, --soft, --dim, --hdr-a, --hdr-b, --chip, --float, --float-edge, --pill,
-    --card-a, --card-b, --card-hi, --drop, --tile, --icon, --icon-bg, --track, --roster-a, --roster-b,
+    --card-a, --card-b, --card-hi, --menu, --drop, --tile, --icon, --icon-bg, --track, --roster-a, --roster-b,
     --rcard-a, --rcard-b, --rcard-on-a, --rcard-on-b, --foot, --shade, --title-a, --title-b, --title-glow,
     --on-accent, --accent-darken;
   transition-duration: 0.7s;
@@ -126,6 +128,7 @@
   --card-a: rgba(255, 255, 255, 0.64);
   --card-b: rgba(238, 243, 250, 0.7);
   --card-hi: rgba(255, 255, 255, 0.9);
+  --menu: #ffffff;
   --drop: rgba(30, 50, 90, 0.22);
   --tile: rgba(226, 235, 247, 0.55);
   --icon: #1d63d6;
@@ -181,6 +184,15 @@ button:disabled {
   backdrop-filter: blur(18px);
 }
 
+/* Solid drop-down panel (the ☰ menu, the sort list), so nothing behind it shows through. */
+@utility menu-panel {
+  background: var(--menu);
+  border: 1px solid var(--edge);
+  box-shadow:
+    inset 0 1px 0 var(--card-hi),
+    0 24px 60px -20px var(--drop);
+}
+
 /* Glossy blue for the active pill and toggles. */
 @utility brand-fill {
   background: linear-gradient(180deg, #3a95ff, #1b62e6);
@@ -189,6 +201,14 @@ button:disabled {
   box-shadow:
     0 0 18px rgba(47, 139, 255, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* The timeline sheet rises from the bottom edge. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
 }
 
 .no-scrollbar {

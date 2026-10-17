@@ -39,6 +39,7 @@ export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
     rig.dragging = false;
     ref.current?.removeAttribute("data-drag");
     rig.lastInput = performance.now();
+    rig.wake();
   };
 
   const handlers = {
@@ -67,6 +68,7 @@ export function useTurntableInput(rig: Rig, onZoom: (factor: number) => void) {
       rig.yaw += (e.clientX - lastX.current) * 0.009;
       lastX.current = e.clientX;
       rig.lastInput = performance.now();
+      rig.wake();
     },
     onPointerUp: (e: PointerEvent<HTMLDivElement>) => release(e.pointerId),
     onPointerCancel: (e: PointerEvent<HTMLDivElement>) => release(e.pointerId),

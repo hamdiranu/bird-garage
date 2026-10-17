@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import Image from "next/image";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -6,6 +6,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { MAKER_LOGOS } from "@/data/makers";
 import { useFitText } from "@/hooks/useFitText";
 import { useI18n } from "@/i18n/I18nProvider";
+import { carPath, shareLink } from "@/lib/share";
 import type { Car, Service } from "@/types/fleet";
 
 interface InfoCardProps {
@@ -34,14 +35,18 @@ export function InfoCard({ cardRef, car, service, reduceMotion }: InfoCardProps)
     <section
       ref={cardRef}
       aria-live="polite"
-      className="glass relative z-10 col-start-1 row-start-1 flex min-w-0 flex-col overflow-hidden rounded-2xl p-3 [--gap:clamp(8px,calc(4vh_-_17px),24px)] sm:p-4 md:p-5 lg:p-4 xl:p-5 2xl:p-6"
+      className="glass relative z-10 mx-3 mt-3 flex max-md:order-4 md:col-start-1 md:mx-0 md:mt-0 min-w-0 flex-col overflow-hidden rounded-2xl p-3 [--gap:clamp(8px,calc(4vh_-_17px),24px)] sm:p-4 md:row-start-1 md:p-5 lg:p-4 xl:p-5 2xl:p-6"
     >
-      {/* service pill, with its role beside it (the role drops below the pill if the card is too narrow) */}
-      <div data-anim className="mb-(--gap) flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <p className="rounded-md bg-accent px-2.5 py-[5px] text-[10px] font-semibold uppercase leading-none tracking-[.1em] text-(--on-accent) shadow-[0_0_16px_color-mix(in_srgb,var(--accent)_30%,transparent)] transition-colors duration-300 md:text-[11px]">
-          {service.name}
-        </p>
-        <p className="hidden text-xs leading-none text-soft sm:block md:text-[13px]">{text(service.role)}</p>
+      {/* service pill, with its role beside it (the role drops below the pill if the card is too narrow), and the
+          share button at the end */}
+      <div data-anim className="mb-(--gap) flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <p className="rounded-md bg-accent px-2.5 py-[5px] text-[10px] font-semibold uppercase leading-none tracking-[.1em] text-(--on-accent) shadow-[0_0_16px_color-mix(in_srgb,var(--accent)_30%,transparent)] transition-colors duration-300 md:text-[11px]">
+            {service.name}
+          </p>
+          <p className="text-xs leading-none text-soft md:text-[13px]">{text(service.role)}</p>
+        </div>
+        <ShareButton car={car} />
       </div>
       <p data-anim className="text-sm font-medium uppercase leading-none tracking-[.1em] text-soft md:text-lg 2xl:text-[22px]">{car.maker}</p>
       <h2
@@ -58,32 +63,67 @@ export function InfoCard({ cardRef, car, service, reduceMotion }: InfoCardProps)
   );
 }
 
-/** Two columns under a hairline, split by a short rule (phones stack them). On a tall card the grid centres in
-    the spare room and the maker footer drops to the bottom. */
+/** Two columns under a hairline, split by a short rule. On a tall card the grid centres in the spare room and
+    the maker footer drops to the bottom. */
 function SpecGrid({ car }: { car: Car }) {
   const { t, text, number } = useI18n();
   const specs: [label: string, value: string, icon: IconName][] = [
     [t.specs.body, text(car.body), "car"],
     [t.specs.seats, text(car.seats), "users"],
-    [t.specs.power, text(car.power), "bolt"],
+    [t.specs.power, t.power[car.power], "bolt"],
     [t.specs.length, `${number(car.profile.L, { max: 2 })} m`, "ruler"],
   ];
   return (
-    <dl data-anim className="my-auto grid grid-cols-1 border-t border-edge sm:grid-cols-2">
+    <dl data-anim className="my-auto grid grid-cols-2 border-t border-edge">
       {specs.map(([label, value, icon], i) => (
         <div
           key={label}
-          className={`relative min-w-0 py-[clamp(9px,1.35vh,16px)] ${i ? "border-t border-edge" : ""} ${i === 1 ? "sm:border-t-0" : ""} ${i % 2 ? "sm:pl-4 sm:before:absolute sm:before:inset-y-3 sm:before:left-0 sm:before:w-px sm:before:bg-edge" : "sm:pr-3"}`}
+          className={`relative min-w-0 py-[clamp(9px,1.35vh,16px)] ${i >= 2 ? "border-t border-edge" : ""} ${i % 2 ? "pl-4 before:absolute before:inset-y-3 before:left-0 before:w-px before:bg-edge" : "pr-3"}`}
         >
           {/* icon and label on the first line, the value on the full width under them */}
           <dt className="flex items-center gap-1.5 text-[10px] font-medium uppercase leading-none tracking-[.1em] text-dim md:text-[11px] 2xl:text-xs">
-            <Icon name={icon} className="hidden h-4 w-4 flex-none text-soft sm:block 2xl:h-[18px] 2xl:w-[18px]" />
+            <Icon name={icon} className="h-4 w-4 flex-none text-soft 2xl:h-[18px] 2xl:w-[18px]" />
             {label}
           </dt>
           <dd className="mt-1.5 text-[13px] leading-snug md:text-sm 2xl:text-[15px]">{value}</dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Shares the car's link (the share sheet on phones, the clipboard elsewhere), confirming a copy for a moment. */
+function ShareButton({ car }: { car: Car }) {
+  const { t } = useI18n();
+  const [said, setSaid] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const share = async () => {
+    const result = await shareLink(new URL(carPath(car.id), location.origin).href, t.share.text(car.maker, car.model));
+    if (result !== "copied" && result !== "failed") return;
+    setSaid(result === "copied" ? t.share.copied : t.share.failed);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaid(null), 2200);
+  };
+
+  return (
+    <div className="relative flex-none">
+      <button
+        onClick={share}
+        aria-label={t.share.label}
+        title={t.share.label}
+        className="-mr-1 -mt-1.5 grid h-8 w-8 place-items-center rounded-full text-soft transition-colors hover:bg-(--pill) hover:text-ink"
+      >
+        <Icon name={said === t.share.copied ? "check" : "share"} className="h-[18px] w-[18px]" />
+      </button>
+      <p
+        role="status"
+        className={`pointer-events-none absolute right-0 top-[calc(100%+4px)] z-10 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[11px] font-semibold text-night shadow-lg transition-opacity duration-200 ${said ? "opacity-100" : "opacity-0"}`}
+      >
+        {said}
+      </p>
+    </div>
   );
 }
 
@@ -95,7 +135,7 @@ function MakerFooter({ car }: { car: Car }) {
   const emblem = "col-start-1 row-start-1 h-full w-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,.35)]";
   return (
     <div data-anim className="flex items-center gap-3 border-t border-edge pt-(--gap)">
-      <span className="hidden h-10 w-[52px] flex-none grid-cols-1 grid-rows-1 place-items-center sm:grid 2xl:h-[52px] 2xl:w-16">
+      <span className="grid h-10 w-[52px] flex-none grid-cols-1 grid-rows-1 place-items-center 2xl:h-[52px] 2xl:w-16">
         {logo ? (
           <>
             {logo.dark && <Image src={logo.dark} alt="" width={64} height={52} unoptimized loading="eager" className={`${emblem} light:hidden`} />}
