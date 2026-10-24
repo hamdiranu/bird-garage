@@ -77,7 +77,11 @@ The pages are prerendered as static HTML: the home page and one `/car/<id>` page
 
 **Security headers.** Every response also carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY` and a `Permissions-Policy` that turns off the camera, microphone and location (WebXR stays allowed, for AR). They're set in `next.config.ts`.
 
-Link previews need the site's public address for their image URLs. Vercel provides it; anywhere else, set `SITE_URL` (for example `SITE_URL=https://garage.example.com`) when building. Without it the build warns and falls back to `http://localhost:3000`.
+**The site's address.** Preview pictures, canonical links and the sitemap are all written out in full, so the build has to know where the site lives (`lib/previews.ts`). It takes the first of `SITE_URL`, Netlify's `URL`, Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, and failing those the published address, `https://bird-garage.netlify.app`. Set `SITE_URL` when hosting it somewhere else:
+
+```bash
+SITE_URL=https://garage.example.com npm run build
+```
 
 > `AGENTS.md` is written by `next dev` itself (Next 16 adds it for coding agents). It's safe to commit.
 
@@ -169,6 +173,8 @@ src/
     page.tsx              renders <Garage /> inside the language provider
     car/[id]/page.tsx     one prerendered page per car: the garage opened on it, with its preview
     capture/thumbs/       working page that renders the thumbnails for scripts/capture.mjs
+    robots.ts             /robots.txt: open to crawlers but for /capture/, and names the sitemap
+    sitemap.ts            /sitemap.xml: the garage and every car page, with its preview picture
     globals.css           Tailwind setup, theme tokens, glass/brand utilities
     icon.png              favicon
   components/
@@ -203,6 +209,7 @@ src/
       useTurntableInput.ts  drag to turn, pinch and wheel to zoom
       types.ts            Rig, Frame, HotspotDots and StageProps, shared with the page
     ui/                   generic pieces: Icon, CarThumb, SideView (2D canvas), InlineScript
+      CarLinks.tsx        off-screen links between the garage and the car pages, for crawlers and screen readers
   data/                   content, no logic
     cars.ts               the fleet in roster order, with the profile defaults and each car's hotspots
     services.ts           services (name, role, accent, badge) and the filter order
@@ -230,7 +237,8 @@ src/
     language.ts           language resolution and persistence, localized text and numbers
     storage.ts            what the garage remembers (localStorage)
     share.ts              /car/<id> links and sharing them
-    previews.ts           link-preview metadata (server only)
+    previews.ts           link-preview metadata, and the site's address (server only)
+    jsonLd.tsx            structured data: WebSite for the garage, a breadcrumb for a car page
     assets.ts             content-hashed URLs for models and thumbnails
     arSupport.ts          whether and how the device can do AR (no three.js)
     ar.ts                 "View in your space": USDZ for AR Quick Look, or a WebXR session
@@ -303,6 +311,18 @@ What happens next depends on the scan:
 ### Link previews (`app/car/[id]`, `lib/previews.ts`, `scripts/capture.mjs`)
 
 A URL hash never reaches the server, so `/#limo` links can't carry a picture of their car. The share button therefore copies `/car/limo`: a page prerendered for each car (`generateStaticParams`) that opens the garage on it, with its own title, description, Open Graph and X card metadata. The picture is `public/previews/<id>.jpg`, a 1200×630 screenshot of `/car/<id>?capture`: the car on the night showroom platform with its name, and nothing else on screen. `?capture` hides the header, cards, roster and buttons, stops the spin, and marks the stage `data-ready` once the model is standing; the script waits for that. A car without a picture yet shares without one.
+
+### Search engines (`app/robots.ts`, `app/sitemap.ts`, `lib/jsonLd.tsx`)
+
+The garage is one 3D app behind one URL, which is awkward to index, so what a crawler needs is spelled out:
+
+- **`/robots.txt`** opens the site and names the sitemap. `/capture/` is the one path kept out.
+- **`/sitemap.xml`** lists the garage and all `/car/<id>` pages, each with its preview picture for image search. It is how the car pages are found at all: the roster is buttons, not links.
+- **`CarLinks`** (`components/ui/CarLinks.tsx`) is an off-screen list of plain links between the pages, so crawling doesn't depend on the sitemap alone — and so a screen reader can reach the permalinks.
+- **A heading per page.** The garage's own headings name the car on stage, never the page, so each page carries an off-screen `<h1>`: the site on the home page, the car on a car page.
+- **JSON-LD** gives the home page a `WebSite` (which is how a result gets headed "Bird Garage" rather than the bare domain) and each car page a breadcrumb back to the garage.
+
+To have Google index it, add the site in [Search Console](https://search.google.com/search-console), verify it, and submit `/sitemap.xml`. Verifying by meta tag takes the token from Search Console in `GOOGLE_SITE_VERIFICATION` at build time.
 
 ### View in your space (`lib/ar.ts`)
 
@@ -477,6 +497,7 @@ Recent Chrome, Edge, Safari and Firefox.
 - **Hotspot dots don't hide behind other parts.** They fade by which way the body faces, not by what's in front of them, so at some angles a dot can show over a mirror or an open door.
 - **AR is phone-only.** Desktop browsers don't offer it, so the button only appears on supporting phones and tablets.
 - **Hidden tabs pause animation.** Browsers pause rendering in hidden tabs, so camera easing, GSAP tweens and theme fades catch up when the tab is shown again.
+- **Only the English text is indexed.** The language switch swaps the interface in the browser rather than at a URL of its own, so a search engine only ever sees the English copy. Separately indexing the Indonesian one would mean giving it its own path (`/id/…`) and a pair of `hreflang` links.
 
 ---
 

@@ -3,7 +3,7 @@ import { Barlow_Condensed, Chakra_Petch } from "next/font/google";
 import "./globals.css";
 import { InlineScript } from "@/components/ui/InlineScript";
 import { CARS } from "@/lib/fleet";
-import { carMetadata, siteUrl } from "@/lib/previews";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, carMetadata, siteUrl } from "@/lib/previews";
 import { themeScript } from "@/lib/theme";
 
 const barlow = Barlow_Condensed({
@@ -21,9 +21,18 @@ const chakra = Chakra_Petch({
 // The home page shares with the first car's preview picture.
 export const metadata: Metadata = {
   metadataBase: siteUrl,
-  ...carMetadata(CARS[0], "/", { title: "Bird Garage · Bluebird Group", description: "Car-select screen for the Bluebird Group fleet, in 3D. Unofficial." }),
+  ...carMetadata(CARS[0], "/", { title: SITE_TITLE, description: SITE_DESCRIPTION }),
+  applicationName: SITE_NAME,
   authors: [{ name: "Hamdi Ranuharja" }],
   creator: "Hamdi Ranuharja",
+  // Pages are open to crawlers, and Google may show a car's preview picture full size rather than as a thumbnail.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+  },
+  // Set GOOGLE_SITE_VERIFICATION to the token from Search Console to verify the site by meta tag.
+  verification: process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : undefined,
 };
 
 export const viewport: Viewport = {
